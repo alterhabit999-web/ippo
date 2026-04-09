@@ -75,7 +75,7 @@ async function deleteQuoteDB(id) {
 async function loadRandomOtherQuote(userId) {
   const { data, error } = await supabase
     .from("quotes").select("id, text, source, user_id")
-    .neq("user_id", userId).limit(50);
+    .neq("user_id", userId).neq("source", "iPPO").limit(50);
   if (error || !data || data.length === 0) return null;
   return data[Math.floor(Math.random() * data.length)];
 }
