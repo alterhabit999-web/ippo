@@ -41,7 +41,7 @@ async function loadAllRecords() {
 // 記録をSupabaseにupsert
 async function saveRecord(data, userId) {
   const row = { ...recordToRow(data), user_id: userId };
-  const { error } = await supabase.from("records").upsert(row, { onConflict: "date,type" });
+  const { error } = await supabase.from("records").upsert(row, { onConflict: "user_id,date,type" });
   if (error) console.error("save error:", error);
 }
 
