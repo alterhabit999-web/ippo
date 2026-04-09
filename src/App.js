@@ -739,8 +739,8 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
                     <div style={{fontSize:12,color:T.text,lineHeight:1.7}}>"{q.text}"</div>
                     {q.source&&<div style={{fontSize:10,color:T.textMuted,marginTop:2}}>— {q.source}</div>}
                   </div>
-                  <button onClick={()=>{setEditId(q.id);setEditText(q.text);setEditSource(q.source||"");}}
-                    style={{background:"none",border:`0.5px solid ${T.border}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.textMuted,cursor:"pointer",flexShrink:0}}>編集</button>
+                  {!q.isDefault&&<button onClick={()=>{setEditId(q.id);setEditText(q.text);setEditSource(q.source||"");}}
+                    style={{background:"none",border:`0.5px solid ${T.border}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.textMuted,cursor:"pointer",flexShrink:0}}>編集</button>}
                 </div>
               )}
             </div>
@@ -831,6 +831,15 @@ function SettingsScreen({onMenu,onLogout,onTitle}){
   );
 }
 
+// ── デフォルト言葉（常に保持） ────────────────────────
+const DEFAULT_QUOTES = [
+  {id:"default-1",text:"小さな一歩が、やがて大きな道になる。",source:"",isDefault:true},
+  {id:"default-2",text:"完璧じゃなくていい。続けることが大切。",source:"",isDefault:true},
+  {id:"default-3",text:"今日の自分に、やさしくいよう。",source:"",isDefault:true},
+  {id:"default-4",text:"焦らなくていい。一歩ずつ、それがiPPO。",source:"",isDefault:true},
+  {id:"default-5",text:"今日も、ちゃんと生きた。",source:"",isDefault:true},
+];
+
 // ── App ───────────────────────────────────────────────
 export default function App(){
   const [screen,setScreen]=useState("loading");
@@ -840,13 +849,7 @@ export default function App(){
   const [todayRecord,setTodayRecord]=useState({am:null,pm:null});
   const [session,setSession]=useState(null);
   const [authReady,setAuthReady]=useState(false);
-  const [quotes,setQuotes]=useState([
-    {id:1,text:"小さな一歩が、やがて大きな道になる。",source:""},
-    {id:2,text:"完璧じゃなくていい。続けることが大切。",source:""},
-    {id:3,text:"今日の自分に、やさしくいよう。",source:""},
-    {id:4,text:"焦らなくていい。一歩ずつ、それがiPPO。",source:""},
-    {id:5,text:"今日も、ちゃんと生きた。",source:""},
-  ]);
+  const [quotes,setQuotes]=useState(DEFAULT_QUOTES);
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
@@ -865,7 +868,7 @@ export default function App(){
     Promise.all([loadAllRecords(), loadQuotes()]).then(([recs, dbQuotes])=>{
       setAllRecords(recs);
       setTodayRecord(recs[todayStr]||{am:null,pm:null});
-      if(dbQuotes !== null && dbQuotes.length > 0) setQuotes(dbQuotes);
+      if(dbQuotes !== null) setQuotes([...DEFAULT_QUOTES, ...dbQuotes]);
       setScreen("main");
     });
   },[authReady,session]);
