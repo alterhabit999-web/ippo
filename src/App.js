@@ -710,6 +710,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
     setOtherQuote(q);
     setLoadingOther(false);
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(()=>{fetchOtherQuote();},[]);
 
   const handleAddNew=async()=>{
