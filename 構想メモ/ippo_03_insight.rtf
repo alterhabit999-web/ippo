@@ -1,0 +1,162 @@
+{\rtf1\ansi\ansicpg932\cocoartf2868
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import \{ useState \} from "react";\
+\
+const now = new Date();\
+const isAM = now.getHours() < 17;\
+const AM = \{ bgPage:"#FFF4E8", bg:"#FFF8F0", sub:"#FFE8CC", accent:"#D45F10", accentLight:"#F0A060", border:"#EEC898", text:"#3A2A18", textMuted:"#A07850" \};\
+const PM = \{ bgPage:"#1A2028", bg:"#232830", sub:"#2E3840", accent:"#5A8AAA", accentLight:"#A8C8D8", border:"#343C48", text:"#D8E8EE", textMuted:"#6A7888" \};\
+const T = isAM ? AM : PM;\
+const moodColor="#F0A060", energyColor="#5A8AAA", stressColor="#C07888", sleepColor="#8AAA6A";\
+\
+function generateData(days) \{\
+  const data = [];\
+  for (let i = days-1; i >= 0; i--) \{\
+    const d = new Date(); d.setDate(d.getDate()-i);\
+    data.push(\{ label:`$\{d.getMonth()+1\}/$\{d.getDate()\}`, mood:Math.round(2+Math.random()*3), energy:Math.round(2+Math.random()*3), stress:Math.round(1+Math.random()*4), sleep:parseFloat((5+Math.random()*4).toFixed(1)), amMood:Math.round(2+Math.random()*3) \});\
+  \}\
+  return data;\
+\}\
+const DATA = \{ "7":generateData(7), "30":generateData(30), "all":generateData(90) \};\
+const CHART_WIDTH = \{ "7":260, "30":520, "all":900 \};\
+const LABEL_STEP  = \{ "7":1,   "30":5,   "all":20  \};\
+\
+function avg(arr,key)\{ const v=arr.map(d=>d[key]).filter(Boolean); return (v.reduce((a,b)=>a+b,0)/v.length).toFixed(1); \}\
+function showLabels(data,period)\{ return data.map((_,i)=>i).filter(i => i % LABEL_STEP[period] === 0 || i === data.length-1); \}\
+\
+function MoodLineChart(\{ data, activeSeries, period \}) \{\
+  const padL=28,padR=12,padT=10,padB=28, W=CHART_WIDTH[period], H=130, innerW=W-padL-padR, innerH=H-padT-padB;\
+  const toX=i=>padL+i*(innerW/(data.length-1||1)), toY=v=>padT+innerH-((v-1)/4)*innerH;\
+  const series=[\{key:"mood",color:moodColor\},\{key:"energy",color:energyColor\},\{key:"stress",color:stressColor\}];\
+  return (\
+    <div style=\{\{ overflowX:"auto", WebkitOverflowScrolling:"touch" \}\}>\
+      <svg width=\{W\} height=\{H\} style=\{\{ display:"block" \}\}>\
+        \{[1,2,3,4,5].map(t=>(\
+          <g key=\{t\}>\
+            <line x1=\{padL\} y1=\{toY(t)\} x2=\{W-padR\} y2=\{toY(t)\} stroke=\{T.border\} strokeWidth=\{0.5\}/>\
+            <text x=\{padL-4\} y=\{toY(t)+4\} textAnchor="end" fontSize=\{8\} fill=\{T.textMuted\}>\{t\}</text>\
+          </g>\
+        ))\}\
+        \{showLabels(data,period).map(i=>(\
+          <text key=\{i\} x=\{toX(i)\} y=\{H-2\} textAnchor="middle" fontSize=\{7\} fill=\{T.textMuted\}>\{data[i].label\}</text>\
+        ))\}\
+        \{series.map(s=>(\
+          <polyline key=\{s.key\} points=\{data.map((d,i)=>`$\{toX(i)\},$\{toY(d[s.key])\}`).join(" ")\}\
+            fill="none" stroke=\{s.color\} strokeWidth=\{activeSeries&&activeSeries!==s.key?0.5:1.8\}\
+            opacity=\{activeSeries&&activeSeries!==s.key?0.15:0.9\} strokeLinejoin="round" strokeLinecap="round"/>\
+        ))\}\
+        \{data.length<=7 && series.filter(s=>!activeSeries||activeSeries===s.key).map(s=>\
+          data.map((d,i)=><circle key=\{`$\{s.key\}-$\{i\}`\} cx=\{toX(i)\} cy=\{toY(d[s.key])\} r=\{3\} fill=\{s.color\} opacity=\{0.9\}/>)\
+        )\}\
+      </svg>\
+    </div>\
+  );\
+\}\
+\
+function SleepLineChart(\{ data, period \}) \{\
+  const padL=28,padR=12,padT=10,padB=28, W=CHART_WIDTH[period], H=110, innerW=W-padL-padR, innerH=H-padT-padB;\
+  const minV=3,maxV=12, toX=i=>padL+i*(innerW/(data.length-1||1)), toY=v=>padT+innerH-((v-minV)/(maxV-minV))*innerH;\
+  return (\
+    <div style=\{\{ overflowX:"auto", WebkitOverflowScrolling:"touch" \}\}>\
+      <svg width=\{W\} height=\{H\} style=\{\{ display:"block" \}\}>\
+        \{[3,6,9,12].map(t=>(\
+          <g key=\{t\}>\
+            <line x1=\{padL\} y1=\{toY(t)\} x2=\{W-padR\} y2=\{toY(t)\} stroke=\{T.border\} strokeWidth=\{0.5\}/>\
+            <text x=\{padL-4\} y=\{toY(t)+4\} textAnchor="end" fontSize=\{8\} fill=\{T.textMuted\}>\{t\}h</text>\
+          </g>\
+        ))\}\
+        \{showLabels(data,period).map(i=>(\
+          <text key=\{i\} x=\{toX(i)\} y=\{H-2\} textAnchor="middle" fontSize=\{7\} fill=\{T.textMuted\}>\{data[i].label\}</text>\
+        ))\}\
+        <polyline points=\{data.map((d,i)=>`$\{toX(i)\},$\{toY(d.sleep)\}`).join(" ")\} fill="none" stroke=\{sleepColor\} strokeWidth=\{1.8\} strokeLinejoin="round" strokeLinecap="round" opacity=\{0.9\}/>\
+        \{data.length<=7 && data.map((d,i)=><circle key=\{i\} cx=\{toX(i)\} cy=\{toY(d.sleep)\} r=\{3\} fill=\{sleepColor\} opacity=\{0.9\}/>)\}\
+      </svg>\
+    </div>\
+  );\
+\}\
+\
+function ScatterChart(\{ data \}) \{\
+  const padL=28,padR=8,padT=10,padB=28, W=260, H=120, innerW=W-padL-padR, innerH=H-padT-padB;\
+  const minS=3,maxS=12, toX=s=>padL+((Math.min(Math.max(s,minS),maxS)-minS)/(maxS-minS))*innerW, toY=v=>padT+innerH-((v-1)/4)*innerH;\
+  return (\
+    <svg width="100%" viewBox=\{`0 0 $\{W\} $\{H\}`\}>\
+      \{[1,2,3,4,5].map(t=>(<g key=\{t\}><line x1=\{padL\} y1=\{toY(t)\} x2=\{W-padR\} y2=\{toY(t)\} stroke=\{T.border\} strokeWidth=\{0.5\}/><text x=\{padL-4\} y=\{toY(t)+4\} textAnchor="end" fontSize=\{8\} fill=\{T.textMuted\}>\{t\}</text></g>))\}\
+      \{[3,6,9,12].map(s=><text key=\{s\} x=\{toX(s)\} y=\{H-2\} textAnchor="middle" fontSize=\{8\} fill=\{T.textMuted\}>\{s\}h</text>)\}\
+      \{data.map((d,i)=><circle key=\{i\} cx=\{toX(d.sleep)\} cy=\{toY(d.amMood)\} r=\{3.5\} fill=\{moodColor\} opacity=\{0.5\}/>)\}\
+    </svg>\
+  );\
+\}\
+\
+function Card(\{ title, children, legend, onLegendClick, activeSeries \}) \{\
+  return (\
+    <div style=\{\{ background:T.bg, border:`0.5px solid $\{T.border\}`, borderRadius:16, padding:"14px 16px", marginBottom:12 \}\}>\
+      <div style=\{\{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10 \}\}>\
+        <span style=\{\{ fontSize:12, fontWeight:500, color:T.text, letterSpacing:"0.04em" \}\}>\{title\}</span>\
+        \{legend && <div style=\{\{ display:"flex", gap:8 \}\}>\{legend.map(([color,label,key])=>(\
+          <div key=\{label\} onClick=\{()=>onLegendClick&&onLegendClick(key)\}\
+            style=\{\{ display:"flex", alignItems:"center", gap:4, cursor:onLegendClick?"pointer":"default", opacity:activeSeries&&activeSeries!==key?0.35:1, transition:"opacity 0.15s" \}\}>\
+            <div style=\{\{ width:20, height:2, borderRadius:1, background:color \}\}/>\
+            <span style=\{\{ fontSize:9, color:T.textMuted \}\}>\{label\}</span>\
+          </div>\
+        ))\}</div>\}\
+      </div>\
+      \{children\}\
+    </div>\
+  );\
+\}\
+\
+function StatRow(\{ items \}) \{\
+  return (\
+    <div style=\{\{ display:"grid", gridTemplateColumns:`repeat($\{items.length\}, 1fr)`, gap:8, marginBottom:12 \}\}>\
+      \{items.map(([label,val,color])=>(\
+        <div key=\{label\} style=\{\{ background:T.bg, border:`0.5px solid $\{T.border\}`, borderRadius:12, padding:"10px 8px", textAlign:"center" \}\}>\
+          <div style=\{\{ fontSize:9, color:T.textMuted, marginBottom:4 \}\}>\{label\}</div>\
+          <div style=\{\{ fontSize:18, fontWeight:500, color:color||T.accent, fontFamily:"Georgia,serif" \}\}>\{val\}</div>\
+        </div>\
+      ))\}\
+    </div>\
+  );\
+\}\
+\
+export default function App() \{\
+  const [period, setPeriod] = useState("7");\
+  const [activeSeries, setActiveSeries] = useState(null);\
+  const data = DATA[period];\
+  return (\
+    <div style=\{\{ display:"flex", justifyContent:"center", padding:"1.5rem 0", fontFamily:"var(--font-sans)" \}\}>\
+      <div style=\{\{ width:300, borderRadius:28, overflow:"hidden", border:`1px solid $\{T.border\}`, background:T.bgPage, display:"flex", flexDirection:"column" \}\}>\
+        <div style=\{\{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"18px 20px 10px" \}\}>\
+          <div style=\{\{ display:"flex", flexDirection:"column", gap:4 \}\}>\{[0,1,2].map(i=><div key=\{i\} style=\{\{ width:18, height:1.5, background:T.textMuted, borderRadius:1 \}\}/>)\}</div>\
+          <span style=\{\{ fontSize:15, fontWeight:500, letterSpacing:"0.12em", color:T.text, fontFamily:"Georgia,serif" \}\}>iPPO</span>\
+          <div style=\{\{ width:18 \}\}/>\
+        </div>\
+        <div style=\{\{ padding:"4px 16px 24px", overflowY:"auto", maxHeight:640 \}\}>\
+          <div style=\{\{ display:"flex", gap:4, background:T.sub, borderRadius:10, padding:4, marginBottom:16 \}\}>\
+            \{[["7","7\uc0\u26085 "],["30","30\u26085 "],["all","\u20840 \u26399 \u38291 "]].map(([key,label])=>(\
+              <button key=\{key\} onClick=\{()=>\{setPeriod(key);setActiveSeries(null);\}\}\
+                style=\{\{ flex:1, padding:"7px 0", fontSize:11, fontWeight:500, border:"none", cursor:"pointer", borderRadius:7, letterSpacing:"0.04em", background:period===key?T.bg:"transparent", color:period===key?T.accent:T.textMuted, transition:"all 0.15s" \}\}>\{label\}</button>\
+            ))\}\
+          </div>\
+          <StatRow items=\{[["\uc0\u27671 \u20998  \u24179 \u22343 ",avg(data,"mood"),moodColor],["\u12456 \u12493 \u12523 \u12462 \u12540 ",avg(data,"energy"),energyColor],["\u12473 \u12488 \u12524 \u12473 ",avg(data,"stress"),stressColor],[`\u30561 \u30496  \u24179 \u22343 `,`$\{avg(data,"sleep")\}h`,sleepColor]]\}/>\
+          <Card title="\uc0\u27671 \u20998 \u12539 \u12456 \u12493 \u12523 \u12462 \u12540 \u12539 \u12473 \u12488 \u12524 \u12473 " legend=\{[[moodColor,"\u27671 \u20998 ","mood"],[energyColor,"\u12456 \u12493 \u12523 \u12462 \u12540 ","energy"],[stressColor,"\u12473 \u12488 \u12524 \u12473 ","stress"]]\} onLegendClick=\{key=>setActiveSeries(p=>p===key?null:key)\} activeSeries=\{activeSeries\}>\
+            <div style=\{\{ fontSize:9, color:T.textMuted, marginBottom:6 \}\}>\uc0\u20961 \u20363 \u12434 \u12479 \u12483 \u12503 \u12375 \u12390 \u32094 \u12426 \u36796 \u12415 \u12288 \{period!=="7"&&"\u8592  \u12473 \u12463 \u12525 \u12540 \u12523 \u12391 \u20840 \u20307 \u12434 \u30906 \u35469 "\}</div>\
+            <MoodLineChart data=\{data\} activeSeries=\{activeSeries\} period=\{period\}/>\
+          </Card>\
+          <Card title="\uc0\u30561 \u30496 \u26178 \u38291 \u12398 \u25512 \u31227 " legend=\{[[sleepColor,"\u30561 \u30496 \u26178 \u38291 "]]\}>\
+            \{period!=="7"&&<div style=\{\{ fontSize:9, color:T.textMuted, marginBottom:6 \}\}>\uc0\u8592  \u12473 \u12463 \u12525 \u12540 \u12523 \u12391 \u20840 \u20307 \u12434 \u30906 \u35469 </div>\}\
+            <SleepLineChart data=\{data\} period=\{period\}/>\
+          </Card>\
+          <Card title="\uc0\u30561 \u30496 \u26178 \u38291  \'d7 \u32716 \u26397 \u12398 \u27671 \u20998 ">\
+            <div style=\{\{ fontSize:9, color:T.textMuted, marginBottom:6 \}\}>\uc0\u27178 \u36600 \u65306 \u30561 \u30496 \u26178 \u38291 \u12288 \u32294 \u36600 \u65306 \u32716 \u26397 \u12398 \u27671 \u20998 \u12473 \u12467 \u12450 </div>\
+            <ScatterChart data=\{data\}/>\
+          </Card>\
+        </div>\
+      </div>\
+    </div>\
+  );\
+\}}

@@ -1,0 +1,170 @@
+{\rtf1\ansi\ansicpg932\cocoartf2868
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\paperw11900\paperh16840\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 import \{ useState \} from "react";\
+\
+const now = new Date();\
+const isAM = now.getHours() < 17;\
+const AM = \{ bgPage:"#FFF4E8", bg:"#FFF8F0", sub:"#FFE8CC", accent:"#D45F10", accentLight:"#F0A060", border:"#EEC898", text:"#3A2A18", textMuted:"#A07850" \};\
+const PM = \{ bgPage:"#1A2028", bg:"#232830", sub:"#2E3840", accent:"#5A8AAA", accentLight:"#A8C8D8", border:"#343C48", text:"#D8E8EE", textMuted:"#6A7888" \};\
+const T = isAM ? AM : PM;\
+\
+const DEFAULT_QUOTES = [\
+  \{ id:1, text:"\uc0\u23567 \u12373 \u12394 \u19968 \u27497 \u12364 \u12289 \u12420 \u12364 \u12390 \u22823 \u12365 \u12394 \u36947 \u12395 \u12394 \u12427 \u12290 ", source:"" \},\
+  \{ id:2, text:"\uc0\u23436 \u29863 \u12376 \u12419 \u12394 \u12367 \u12390 \u12356 \u12356 \u12290 \u32154 \u12369 \u12427 \u12371 \u12392 \u12364 \u22823 \u20999 \u12290 ", source:"" \},\
+  \{ id:3, text:"\uc0\u20170 \u26085 \u12398 \u33258 \u20998 \u12395 \u12289 \u12420 \u12373 \u12375 \u12367 \u12356 \u12424 \u12358 \u12290 ", source:"" \},\
+];\
+\
+function Section(\{ title, children \}) \{\
+  return (\
+    <div style=\{\{ marginBottom:20 \}\}>\
+      <div style=\{\{ fontSize:10, fontWeight:500, letterSpacing:"0.1em", color:T.accent, marginBottom:8 \}\}>\{title\}</div>\
+      <div style=\{\{ background:T.bg, border:`0.5px solid $\{T.border\}`, borderRadius:14, overflow:"hidden" \}\}>\
+        \{children\}\
+      </div>\
+    </div>\
+  );\
+\}\
+\
+function Row(\{ label, sub, right, onTap, last \}) \{\
+  return (\
+    <div onClick=\{onTap\} style=\{\{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 16px", borderBottom:last?"none":`0.5px solid $\{T.border\}`, cursor:onTap?"pointer":"default" \}\}>\
+      <div>\
+        <div style=\{\{ fontSize:13, color:T.text \}\}>\{label\}</div>\
+        \{sub && <div style=\{\{ fontSize:11, color:T.textMuted, marginTop:2 \}\}>\{sub\}</div>\}\
+      </div>\
+      \{right && <div style=\{\{ fontSize:13, color:T.textMuted \}\}>\{right\}</div>\}\
+    </div>\
+  );\
+\}\
+\
+function Toggle(\{ value, onChange \}) \{\
+  return (\
+    <div onClick=\{()=>onChange(!value)\} style=\{\{ width:40, height:22, borderRadius:11, cursor:"pointer", transition:"background 0.2s", background:value?T.accent:T.border, position:"relative" \}\}>\
+      <div style=\{\{ position:"absolute", top:3, left:value?21:3, width:16, height:16, borderRadius:"50%", background:"#fff", transition:"left 0.2s" \}\}/>\
+    </div>\
+  );\
+\}\
+\
+function QuoteEditor(\{ quotes, setQuotes \}) \{\
+  const [adding, setAdding]   = useState(false);\
+  const [showAll, setShowAll] = useState(false);\
+  const [newText, setNewText] = useState("");\
+  const [newSource, setNewSource] = useState("");\
+  const [editId, setEditId]   = useState(null);\
+  const PREVIEW = 3;\
+\
+  const handleAdd = () => \{\
+    if (!newText.trim()) return;\
+    setQuotes(prev=>[...prev,\{id:Date.now(),text:newText.trim(),source:newSource.trim()\}]);\
+    setNewText(""); setNewSource(""); setAdding(false);\
+  \};\
+  const handleDelete = (id) => setQuotes(prev=>prev.filter(q=>q.id!==id));\
+  const visible = showAll ? quotes : quotes.slice(0,PREVIEW);\
+\
+  return (\
+    <div>\
+      \{visible.map((q)=>(\
+        <div key=\{q.id\} style=\{\{ padding:"12px 16px", borderBottom:`0.5px solid $\{T.border\}` \}\}>\
+          \{editId===q.id ? (\
+            <div style=\{\{ display:"flex", flexDirection:"column", gap:8 \}\}>\
+              <textarea defaultValue=\{q.text\} onChange=\{e=>q.text=e.target.value\}\
+                style=\{\{ fontSize:12, color:T.text, background:T.sub, border:`0.5px solid $\{T.border\}`, borderRadius:8, padding:"8px 10px", resize:"none", outline:"none", lineHeight:1.6, width:"100%", boxSizing:"border-box" \}\} rows=\{2\}/>\
+              <input defaultValue=\{q.source\} placeholder="\uc0\u20986 \u20856 \u65288 \u20219 \u24847 \u65289 " onChange=\{e=>q.source=e.target.value\}\
+                style=\{\{ fontSize:11, color:T.textMuted, background:T.sub, border:`0.5px solid $\{T.border\}`, borderRadius:8, padding:"6px 10px", outline:"none", width:"100%", boxSizing:"border-box" \}\}/>\
+              <div style=\{\{ display:"flex", gap:8 \}\}>\
+                <button onClick=\{()=>setEditId(null)\} style=\{\{ flex:1, padding:"7px 0", borderRadius:8, fontSize:11, background:T.accent, border:"none", color:"#fff", cursor:"pointer" \}\}>\uc0\u20445 \u23384 </button>\
+                <button onClick=\{()=>handleDelete(q.id)\} style=\{\{ padding:"7px 12px", borderRadius:8, fontSize:11, background:"transparent", border:`0.5px solid $\{T.border\}`, color:T.textMuted, cursor:"pointer" \}\}>\uc0\u21066 \u38500 </button>\
+              </div>\
+            </div>\
+          ) : (\
+            <div style=\{\{ display:"flex", alignItems:"flex-start", justifyContent:"space-between", gap:8 \}\}>\
+              <div style=\{\{ flex:1 \}\}>\
+                <div style=\{\{ fontSize:12, color:T.text, lineHeight:1.6 \}\}>"\{q.text\}"</div>\
+                \{q.source && <div style=\{\{ fontSize:10, color:T.textMuted, marginTop:3 \}\}>\'97 \{q.source\}</div>\}\
+              </div>\
+              <button onClick=\{()=>setEditId(q.id)\} style=\{\{ background:"none", border:`0.5px solid $\{T.border\}`, borderRadius:6, padding:"4px 10px", fontSize:10, color:T.textMuted, cursor:"pointer", flexShrink:0 \}\}>\uc0\u32232 \u38598 </button>\
+            </div>\
+          )\}\
+        </div>\
+      ))\}\
+      \{quotes.length>PREVIEW && (\
+        <div style=\{\{ padding:"10px 16px", borderBottom:`0.5px solid $\{T.border\}` \}\}>\
+          <button onClick=\{()=>setShowAll(p=>!p)\} style=\{\{ width:"100%", padding:"7px 0", borderRadius:8, fontSize:11, background:"transparent", border:"none", color:T.accent, cursor:"pointer", letterSpacing:"0.04em" \}\}>\
+            \{showAll ? "\uc0\u38281 \u12376 \u12427  \u8743 " : `\u19968 \u35239 \u12434 \u34920 \u31034 \u65288 \u20840 $\{quotes.length\}\u20214 \u65289  \u8744 `\}\
+          </button>\
+        </div>\
+      )\}\
+      \{adding ? (\
+        <div style=\{\{ padding:"12px 16px", display:"flex", flexDirection:"column", gap:8 \}\}>\
+          <textarea value=\{newText\} onChange=\{e=>setNewText(e.target.value)\} placeholder="\uc0\u35328 \u33865 \u12434 \u20837 \u21147 ..."\
+            style=\{\{ fontSize:12, color:T.text, background:T.sub, border:`0.5px solid $\{T.border\}`, borderRadius:8, padding:"8px 10px", resize:"none", outline:"none", lineHeight:1.6, width:"100%", boxSizing:"border-box" \}\} rows=\{2\}/>\
+          <input value=\{newSource\} onChange=\{e=>setNewSource(e.target.value)\} placeholder="\uc0\u20986 \u20856 \u65288 \u20219 \u24847 \u65289 \u65306 \u20363 \u65289 \u12450 \u12489 \u12521 \u12540 \u12289 \u22812 \u12392 \u38695 "\
+            style=\{\{ fontSize:11, color:T.textMuted, background:T.sub, border:`0.5px solid $\{T.border\}`, borderRadius:8, padding:"6px 10px", outline:"none", width:"100%", boxSizing:"border-box" \}\}/>\
+          <div style=\{\{ display:"flex", gap:8 \}\}>\
+            <button onClick=\{handleAdd\} style=\{\{ flex:1, padding:"7px 0", borderRadius:8, fontSize:11, background:T.accent, border:"none", color:"#fff", cursor:"pointer" \}\}>\uc0\u36861 \u21152 \u12377 \u12427 </button>\
+            <button onClick=\{()=>\{setAdding(false);setNewText("");setNewSource("");\}\} style=\{\{ padding:"7px 12px", borderRadius:8, fontSize:11, background:"transparent", border:`0.5px solid $\{T.border\}`, color:T.textMuted, cursor:"pointer" \}\}>\uc0\u12461 \u12515 \u12531 \u12475 \u12523 </button>\
+          </div>\
+        </div>\
+      ) : (\
+        <div style=\{\{ padding:"10px 16px" \}\}>\
+          <button onClick=\{()=>setAdding(true)\} style=\{\{ width:"100%", padding:"8px 0", borderRadius:8, fontSize:12, background:"transparent", border:`0.5px solid $\{T.border\}`, color:T.accent, cursor:"pointer", letterSpacing:"0.04em" \}\}>+ \uc0\u35328 \u33865 \u12434 \u36861 \u21152 \u12377 \u12427 </button>\
+        </div>\
+      )\}\
+    </div>\
+  );\
+\}\
+\
+export default function App() \{\
+  const [amTime, setAmTime] = useState("07:00");\
+  const [pmTime, setPmTime] = useState("22:00");\
+  const [amNotif, setAmNotif] = useState(true);\
+  const [pmNotif, setPmNotif] = useState(true);\
+  const [quotes, setQuotes] = useState(DEFAULT_QUOTES);\
+\
+  return (\
+    <div style=\{\{ display:"flex", justifyContent:"center", padding:"1.5rem 0", fontFamily:"var(--font-sans)" \}\}>\
+      <div style=\{\{ width:300, borderRadius:28, overflow:"hidden", border:`1px solid $\{T.border\}`, background:T.bgPage, display:"flex", flexDirection:"column" \}\}>\
+        <div style=\{\{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"18px 20px 10px" \}\}>\
+          <div style=\{\{ display:"flex", flexDirection:"column", gap:4 \}\}>\{[0,1,2].map(i=><div key=\{i\} style=\{\{ width:18, height:1.5, background:T.textMuted, borderRadius:1 \}\}/>)\}</div>\
+          <span style=\{\{ fontSize:15, fontWeight:500, letterSpacing:"0.12em", color:T.text, fontFamily:"Georgia,serif" \}\}>iPPO</span>\
+          <div style=\{\{ width:18 \}\}/>\
+        </div>\
+        <div style=\{\{ padding:"8px 16px 28px", overflowY:"auto", maxHeight:640 \}\}>\
+          <Section title="\uc0\u36890 \u30693 ">\
+            <div style=\{\{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 16px", borderBottom:`0.5px solid $\{T.border\}` \}\}>\
+              <div>\
+                <div style=\{\{ fontSize:13, color:T.text \}\}>\uc0\u26397 \u12398 \u12522 \u12510 \u12452 \u12531 \u12480 \u12540 </div>\
+                <div style=\{\{ fontSize:11, color:T.textMuted, marginTop:2 \}\}>Morning \uc0\u12398 \u36890 \u30693 </div>\
+              </div>\
+              <div style=\{\{ display:"flex", alignItems:"center", gap:10 \}\}>\
+                \{amNotif && <input type="time" value=\{amTime\} onChange=\{e=>setAmTime(e.target.value)\} style=\{\{ fontSize:13, color:T.text, background:"transparent", border:"none", outline:"none", textAlign:"right" \}\}/>\}\
+                <Toggle value=\{amNotif\} onChange=\{setAmNotif\}/>\
+              </div>\
+            </div>\
+            <div style=\{\{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"13px 16px" \}\}>\
+              <div>\
+                <div style=\{\{ fontSize:13, color:T.text \}\}>\uc0\u22812 \u12398 \u12522 \u12510 \u12452 \u12531 \u12480 \u12540 </div>\
+                <div style=\{\{ fontSize:11, color:T.textMuted, marginTop:2 \}\}>Night \uc0\u12398 \u36890 \u30693 </div>\
+              </div>\
+              <div style=\{\{ display:"flex", alignItems:"center", gap:10 \}\}>\
+                \{pmNotif && <input type="time" value=\{pmTime\} onChange=\{e=>setPmTime(e.target.value)\} style=\{\{ fontSize:13, color:T.text, background:"transparent", border:"none", outline:"none", textAlign:"right" \}\}/>\}\
+                <Toggle value=\{pmNotif\} onChange=\{setPmNotif\}/>\
+              </div>\
+            </div>\
+          </Section>\
+          <Section title="\uc0\u20170 \u26085 \u12398 \u19968 \u35328 ">\
+            <QuoteEditor quotes=\{quotes\} setQuotes=\{setQuotes\}/>\
+          </Section>\
+          <Section title="\uc0\u12487 \u12540 \u12479 ">\
+            <Row label="CSV\uc0\u12391 \u12456 \u12463 \u12473 \u12509 \u12540 \u12488 " sub="\u35352 \u37682 \u12487 \u12540 \u12479 \u12434 \u12501 \u12449 \u12452 \u12523 \u12395 \u26360 \u12365 \u20986 \u12377 " right="\'9b" last/>\
+          </Section>\
+        </div>\
+      </div>\
+    </div>\
+  );\
+\}}
