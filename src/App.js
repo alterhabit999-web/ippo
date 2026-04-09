@@ -45,6 +45,32 @@ async function saveRecord(data, userId) {
   if (error) console.error("save error:", error);
 }
 
+// あつめた言葉をSupabaseから取得
+async function loadQuotes() {
+  const { data, error } = await supabase.from("quotes").select("*").order("created_at", { ascending: true });
+  if (error) { console.error("quotes load error:", error); return null; }
+  return data.map(row => ({ id: row.id, text: row.text, source: row.source || "" }));
+}
+
+// 言葉をSupabaseに追加
+async function insertQuote(text, source, userId) {
+  const { data, error } = await supabase.from("quotes").insert({ text, source: source || "", user_id: userId }).select().single();
+  if (error) { console.error("quote insert error:", error); return null; }
+  return data;
+}
+
+// 言葉をSupabaseで更新
+async function updateQuoteDB(id, text, source) {
+  const { error } = await supabase.from("quotes").update({ text, source: source || "" }).eq("id", id);
+  if (error) console.error("quote update error:", error);
+}
+
+// 言葉をSupabaseから削除
+async function deleteQuoteDB(id) {
+  const { error } = await supabase.from("quotes").delete().eq("id", id);
+  if (error) console.error("quote delete error:", error);
+}
+
 // CSVエクスポート（Supabaseから取得）
 async function exportCSV() {
   const recs = await loadAllRecords();
@@ -162,23 +188,23 @@ function Hamburger({onOpen}){
     </button>
   );
 }
-function TopBar({onMenu,onBack}){
+function TopBar({onMenu,onBack,onTitle}){
   return(
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 10px",background:T.bgPage}}>
       {onBack
         ?<button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:T.textMuted,padding:0,lineHeight:1}}>←</button>
         :<Hamburger onOpen={onMenu}/>}
-      <span style={{fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif"}}>iPPO</span>
+      <span onClick={onTitle} style={{fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",cursor:onTitle?"pointer":"default"}}>iPPO</span>
       <div style={{width:26}}/>
     </div>
   );
 }
-function SideMenu({onNav,onClose}){
+function SideMenu({onNav,onClose,onTitle}){
   return(
     <div style={{position:"absolute",inset:0,zIndex:50,display:"flex"}}>
       <div style={{width:200,height:"100%",background:T.sub,borderRight:`0.5px solid ${T.border}`,display:"flex",flexDirection:"column"}}>
-        <div style={{padding:"48px 20px 20px",fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",borderBottom:`0.5px solid ${T.border}`}}>iPPO</div>
-        {[["calendar","カレンダー"],["insight","インサイト"],["settings","設定"]].map(([id,label])=>(
+        <div onClick={()=>{if(onTitle){onTitle();onClose();}}} style={{padding:"48px 20px 20px",fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",borderBottom:`0.5px solid ${T.border}`,cursor:onTitle?"pointer":"default"}}>iPPO</div>
+        {[["calendar","カレンダー"],["quotes","あつめた言葉たち"],["insight","インサイト"],["settings","設定"]].map(([id,label])=>(
           <div key={id} onClick={()=>{onNav(id);onClose();}}
             style={{padding:"16px 20px",fontSize:14,color:T.textMuted,borderBottom:`0.5px solid ${T.border}`,cursor:"pointer"}}
             onMouseOver={e=>e.currentTarget.style.color=T.text}
@@ -335,17 +361,50 @@ function RecordScreen({onDone,onBack,userId}){
   );
 }
 
-function DoneScreen({onMenu,todayRecord}){
-  const quotes=isAM?QUOTES_AM:QUOTES_PM;
+function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
+  const displayQuotes=quotes&&quotes.length>0?quotes:(isAM?QUOTES_AM:QUOTES_PM);
   const [idx,setIdx]=useState(0);
-  const q=quotes[idx];
+  const q=displayQuotes[idx%displayQuotes.length];
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
+  const [showAdd,setShowAdd]=useState(false);
+  const [newText,setNewText]=useState("");
+  const [newSource,setNewSource]=useState("");
+  const [saving,setSaving]=useState(false);
+
+  const handleAdd=async()=>{
+    if(!newText.trim()) return;
+    setSaving(true);
+    const saved = await insertQuote(newText.trim(), newSource.trim(), userId);
+    if(saved && setQuotes) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+    setSaving(false);
+    setNewText("");setNewSource("");setShowAdd(false);
+  };
+
   return(
     <>
+      {/* 言葉追加モーダル */}
+      {showAdd&&(
+        <div style={{position:"absolute",inset:0,zIndex:60,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}} onClick={()=>setShowAdd(false)}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{width:"100%",background:T.bg,borderRadius:"20px",border:`0.5px solid ${T.border}`,padding:"20px 20px 24px",maxHeight:"65vh",overflowY:"auto",boxSizing:"border-box"}}>
+            <div style={{fontSize:14,fontWeight:500,color:T.text,fontFamily:"Georgia,serif",marginBottom:16}}>言葉をあつめる</div>
+            <textarea value={newText} onChange={e=>setNewText(e.target.value)} placeholder="言葉を入力..." rows={3}
+              style={{width:"100%",fontSize:13,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"10px 12px",resize:"none",outline:"none",lineHeight:1.7,boxSizing:"border-box",marginBottom:10}}/>
+            <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧"
+              style={{width:"100%",fontSize:12,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"9px 12px",outline:"none",boxSizing:"border-box",marginBottom:16}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={handleAdd} disabled={saving}
+                style={{flex:1,padding:"12px 0",borderRadius:12,background:saving?T.border:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:500,cursor:saving?"default":"pointer"}}>{saving?"保存中...":"保存する"}</button>
+              <button onClick={()=>setShowAdd(false)} disabled={saving}
+                style={{padding:"12px 16px",borderRadius:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,fontSize:13,cursor:"pointer"}}>キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 10px",background:T.bgPage}}>
         <Hamburger onOpen={onMenu}/>
-        <span style={{fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif"}}>iPPO</span>
+        <span onClick={onTitle} style={{fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",cursor:onTitle?"pointer":"default"}}>iPPO</span>
         <div style={{width:26}}/>
       </div>
       <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 28px 48px",gap:24,background:T.bgPage}}>
@@ -366,14 +425,16 @@ function DoneScreen({onMenu,todayRecord}){
             </div>
           ))}
         </div>
-        <button onClick={()=>setIdx(i=>(i+1)%quotes.length)}
+        <button onClick={()=>setIdx(i=>(i+1)%displayQuotes.length)}
           style={{padding:"6px 20px",borderRadius:99,background:"transparent",border:`0.5px solid ${T.border}`,fontSize:11,color:T.textMuted,cursor:"pointer"}}>別の言葉を見る</button>
+        <button onClick={()=>setShowAdd(true)}
+          style={{padding:"9px 24px",borderRadius:99,background:T.accent,border:"none",fontSize:12,fontWeight:500,color:"#fff",cursor:"pointer",letterSpacing:"0.04em"}}>言葉をあつめる</button>
       </div>
     </>
   );
 }
 
-function CalendarScreen({onMenu,allRecords}){
+function CalendarScreen({onMenu,allRecords,onTitle}){
   const [year,setYear]=useState(now.getFullYear());
   const [month,setMonth]=useState(now.getMonth());
   const [selected,setSelected]=useState(null);
@@ -401,9 +462,9 @@ function CalendarScreen({onMenu,allRecords}){
     const [tab,setTab]=useState(rec.am?"am":"pm");
     const [,m,d]=dateKey.split("-");
     return(
-      <div style={{position:"absolute",inset:0,zIndex:20,background:"rgba(0,0,0,0.3)",display:"flex",alignItems:"flex-end"}} onClick={onClose}>
+      <div style={{position:"absolute",inset:0,zIndex:20,background:"rgba(0,0,0,0.45)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}} onClick={onClose}>
         <div onClick={e=>e.stopPropagation()}
-          style={{width:"100%",background:tab==="am"?AM.bg:PM.bg,borderRadius:"20px 20px 0 0",border:`0.5px solid ${tab==="am"?AM.border:PM.border}`,padding:"20px 20px 32px",maxHeight:"75vh",overflowY:"auto",boxSizing:"border-box"}}>
+          style={{width:"100%",background:tab==="am"?AM.bg:PM.bg,borderRadius:"20px",border:`0.5px solid ${tab==="am"?AM.border:PM.border}`,padding:"20px 20px 24px",maxHeight:"65vh",overflowY:"auto",boxSizing:"border-box"}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
             <span style={{fontSize:14,fontWeight:500,color:tab==="am"?AM.text:PM.text,fontFamily:"Georgia,serif"}}>{parseInt(m)}月{parseInt(d)}日</span>
             <button onClick={onClose} style={{background:"none",border:"none",fontSize:20,color:tab==="am"?AM.textMuted:PM.textMuted,cursor:"pointer",lineHeight:1}}>×</button>
@@ -442,7 +503,7 @@ function CalendarScreen({onMenu,allRecords}){
 
   return(
     <>
-      <TopBar onMenu={onMenu}/>
+      <TopBar onMenu={onMenu} onTitle={onTitle}/>
       <div style={{padding:"4px 18px 0",flex:1,overflowY:"auto",background:T.bgPage,position:"relative"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
           <button onClick={prev} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:T.textMuted,padding:"4px 8px"}}>‹</button>
@@ -487,7 +548,7 @@ function CalendarScreen({onMenu,allRecords}){
   );
 }
 
-function InsightScreen({onMenu,allRecords}){
+function InsightScreen({onMenu,allRecords,onTitle}){
   const [period,setPeriod]=useState("7");
   const [active,setActive]=useState(null);
 
@@ -572,7 +633,7 @@ function InsightScreen({onMenu,allRecords}){
 
   return(
     <>
-      <TopBar onMenu={onMenu}/>
+      <TopBar onMenu={onMenu} onTitle={onTitle}/>
       <div style={{padding:"4px 14px 24px",overflowY:"auto",flex:1,background:T.bgPage}}>
         <div style={{display:"flex",gap:4,background:T.sub,borderRadius:10,padding:4,marginBottom:14}}>
           {[["7","7日"],["30","30日"],["all","全期間"]].map(([key,label])=>(
@@ -619,24 +680,107 @@ function InsightScreen({onMenu,allRecords}){
   );
 }
 
-function SettingsScreen({onMenu,onLogout}){
-  const [amTime,setAmTime]=useState("07:00");
-  const [pmTime,setPmTime]=useState("22:00");
-  const [amOn,setAmOn]=useState(true);
-  const [pmOn,setPmOn]=useState(true);
-  const [quotes,setQuotes]=useState([
-    {id:1,text:"小さな一歩が、やがて大きな道になる。",source:""},
-    {id:2,text:"完璧じゃなくていい。続けることが大切。",source:""},
-    {id:3,text:"今日の自分に、やさしくいよう。",source:""},
-  ]);
-  const [showAll,setShowAll]=useState(false);
+function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
   const [adding,setAdding]=useState(false);
   const [newText,setNewText]=useState("");
   const [newSource,setNewSource]=useState("");
   const [editId,setEditId]=useState(null);
+  const [editText,setEditText]=useState("");
+  const [editSource,setEditSource]=useState("");
+  const [featuredIdx,setFeaturedIdx]=useState(()=>Math.floor(Math.random()*Math.max(quotes.length,1)));
+
+  const featured=quotes.length>0?quotes[featuredIdx%quotes.length]:null;
+
+  return(
+    <>
+      <TopBar onMenu={onMenu} onTitle={onTitle}/>
+      <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1,background:T.bgPage}}>
+        {/* フィーチャー言葉 */}
+        {featured&&(
+          <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:16,padding:"22px 18px",marginBottom:18,textAlign:"center"}}>
+            <div style={{fontSize:10,letterSpacing:"0.12em",color:T.accent,marginBottom:12,fontWeight:500}}>今日の言葉</div>
+            <div style={{fontSize:15,color:T.text,lineHeight:2,fontFamily:"Georgia,serif",whiteSpace:"pre-line"}}>"{featured.text}"</div>
+            {featured.source&&<div style={{fontSize:11,color:T.textMuted,marginTop:8,fontFamily:"Georgia,serif"}}>— {featured.source}</div>}
+            <button onClick={()=>setFeaturedIdx(i=>(i+1)%quotes.length)}
+              style={{marginTop:14,padding:"5px 18px",borderRadius:99,background:"transparent",border:`0.5px solid ${T.border}`,fontSize:11,color:T.textMuted,cursor:"pointer"}}>別の言葉を見る</button>
+          </div>
+        )}
+
+        {/* 言葉一覧 */}
+        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>すべての言葉 ({quotes.length})</div>
+        <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
+          {quotes.length===0&&(
+            <div style={{padding:"20px 14px",fontSize:13,color:T.textMuted,textAlign:"center"}}>まだ言葉がありません</div>
+          )}
+          {quotes.map((q,idx)=>(
+            <div key={q.id} style={{padding:"11px 14px",borderBottom:`0.5px solid ${T.border}`}}>
+              {editId===q.id?(
+                <div style={{display:"flex",flexDirection:"column",gap:7}}>
+                  <textarea value={editText} onChange={e=>setEditText(e.target.value)} rows={2}
+                    style={{fontSize:12,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"7px 10px",resize:"none",outline:"none",lineHeight:1.6,width:"100%",boxSizing:"border-box"}}/>
+                  <input value={editSource} placeholder="出典（任意）" onChange={e=>setEditSource(e.target.value)}
+                    style={{fontSize:11,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"6px 10px",outline:"none",width:"100%",boxSizing:"border-box"}}/>
+                  <div style={{display:"flex",gap:7}}>
+                    <button onClick={async()=>{
+                      await updateQuoteDB(q.id, editText, editSource);
+                      setQuotes(p=>p.map(x=>x.id===q.id?{...x,text:editText,source:editSource}:x));
+                      setEditId(null);
+                    }} style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,background:T.accent,border:"none",color:"#fff",cursor:"pointer"}}>保存</button>
+                    <button onClick={async()=>{
+                      await deleteQuoteDB(q.id);
+                      setQuotes(p=>p.filter(x=>x.id!==q.id));
+                      setEditId(null);
+                    }} style={{padding:"6px 12px",borderRadius:8,fontSize:11,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,cursor:"pointer"}}>削除</button>
+                  </div>
+                </div>
+              ):(
+                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:12,color:T.text,lineHeight:1.7}}>"{q.text}"</div>
+                    {q.source&&<div style={{fontSize:10,color:T.textMuted,marginTop:2}}>— {q.source}</div>}
+                  </div>
+                  <button onClick={()=>{setEditId(q.id);setEditText(q.text);setEditSource(q.source||"");}}
+                    style={{background:"none",border:`0.5px solid ${T.border}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.textMuted,cursor:"pointer",flexShrink:0}}>編集</button>
+                </div>
+              )}
+            </div>
+          ))}
+          {/* 追加フォーム */}
+          {adding?(
+            <div style={{padding:"11px 14px",display:"flex",flexDirection:"column",gap:7}}>
+              <textarea value={newText} onChange={e=>setNewText(e.target.value)} placeholder="言葉を入力..." rows={2}
+                style={{fontSize:12,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"7px 10px",resize:"none",outline:"none",lineHeight:1.6,width:"100%",boxSizing:"border-box"}}/>
+              <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧"
+                style={{fontSize:11,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"6px 10px",outline:"none",width:"100%",boxSizing:"border-box"}}/>
+              <div style={{display:"flex",gap:7}}>
+                <button onClick={async()=>{
+                  if(!newText.trim())return;
+                  const saved=await insertQuote(newText.trim(),newSource.trim(),userId);
+                  if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+                  setNewText("");setNewSource("");setAdding(false);
+                }} style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,background:T.accent,border:"none",color:"#fff",cursor:"pointer"}}>追加する</button>
+                <button onClick={()=>{setAdding(false);setNewText("");setNewSource("");}}
+                  style={{padding:"6px 12px",borderRadius:8,fontSize:11,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,cursor:"pointer"}}>キャンセル</button>
+              </div>
+            </div>
+          ):(
+            <div style={{padding:"9px 14px"}}>
+              <button onClick={()=>setAdding(true)}
+                style={{width:"100%",padding:"7px 0",borderRadius:8,fontSize:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.accent,cursor:"pointer"}}>+ 言葉を追加する</button>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function SettingsScreen({onMenu,onLogout,onTitle}){
+  const [amTime,setAmTime]=useState("07:00");
+  const [pmTime,setPmTime]=useState("22:00");
+  const [amOn,setAmOn]=useState(true);
+  const [pmOn,setPmOn]=useState(true);
   const [exportMsg,setExportMsg]=useState("");
-  const PREVIEW=3;
-  const visible=showAll?quotes:quotes.slice(0,PREVIEW);
 
   function Toggle({value,onChange}){
     return <div onClick={()=>onChange(!value)} style={{width:38,height:21,borderRadius:11,cursor:"pointer",background:value?T.accent:T.border,position:"relative",transition:"background 0.2s"}}><div style={{position:"absolute",top:3,left:value?19:3,width:15,height:15,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}}/></div>;
@@ -651,7 +795,7 @@ function SettingsScreen({onMenu,onLogout}){
 
   return(
     <>
-      <TopBar onMenu={onMenu}/>
+      <TopBar onMenu={onMenu} onTitle={onTitle}/>
       <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1,background:T.bgPage}}>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>通知</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
@@ -664,41 +808,6 @@ function SettingsScreen({onMenu,onLogout}){
               </div>
             </div>
           ))}
-        </div>
-        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>今日の一言</div>
-        <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
-          {visible.map(q=>(
-            <div key={q.id} style={{padding:"11px 14px",borderBottom:`0.5px solid ${T.border}`}}>
-              {editId===q.id?(
-                <div style={{display:"flex",flexDirection:"column",gap:7}}>
-                  <textarea defaultValue={q.text} onChange={e=>q.text=e.target.value} rows={2} style={{fontSize:12,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"7px 10px",resize:"none",outline:"none",lineHeight:1.6,width:"100%",boxSizing:"border-box"}}/>
-                  <input defaultValue={q.source} placeholder="出典（任意）" onChange={e=>q.source=e.target.value} style={{fontSize:11,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"6px 10px",outline:"none",width:"100%",boxSizing:"border-box"}}/>
-                  <div style={{display:"flex",gap:7}}>
-                    <button onClick={()=>setEditId(null)} style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,background:T.accent,border:"none",color:"#fff",cursor:"pointer"}}>保存</button>
-                    <button onClick={()=>setQuotes(p=>p.filter(x=>x.id!==q.id))} style={{padding:"6px 12px",borderRadius:8,fontSize:11,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,cursor:"pointer"}}>削除</button>
-                  </div>
-                </div>
-              ):(
-                <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:8}}>
-                  <div style={{flex:1}}><div style={{fontSize:12,color:T.text,lineHeight:1.6}}>"{q.text}"</div>{q.source&&<div style={{fontSize:10,color:T.textMuted,marginTop:2}}>— {q.source}</div>}</div>
-                  <button onClick={()=>setEditId(q.id)} style={{background:"none",border:`0.5px solid ${T.border}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.textMuted,cursor:"pointer",flexShrink:0}}>編集</button>
-                </div>
-              )}
-            </div>
-          ))}
-          {quotes.length>PREVIEW&&<div style={{padding:"9px 14px",borderBottom:`0.5px solid ${T.border}`}}><button onClick={()=>setShowAll(p=>!p)} style={{width:"100%",padding:"6px 0",borderRadius:8,fontSize:11,background:"transparent",border:"none",color:T.accent,cursor:"pointer"}}>{showAll?`閉じる ∧`:`一覧を表示（全${quotes.length}件） ∨`}</button></div>}
-          {adding?(
-            <div style={{padding:"11px 14px",display:"flex",flexDirection:"column",gap:7}}>
-              <textarea value={newText} onChange={e=>setNewText(e.target.value)} placeholder="言葉を入力..." rows={2} style={{fontSize:12,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"7px 10px",resize:"none",outline:"none",lineHeight:1.6,width:"100%",boxSizing:"border-box"}}/>
-              <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧" style={{fontSize:11,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"6px 10px",outline:"none",width:"100%",boxSizing:"border-box"}}/>
-              <div style={{display:"flex",gap:7}}>
-                <button onClick={()=>{if(!newText.trim())return;setQuotes(p=>[...p,{id:Date.now(),text:newText.trim(),source:newSource.trim()}]);setNewText("");setNewSource("");setAdding(false);}} style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,background:T.accent,border:"none",color:"#fff",cursor:"pointer"}}>追加する</button>
-                <button onClick={()=>{setAdding(false);setNewText("");setNewSource("");}} style={{padding:"6px 12px",borderRadius:8,fontSize:11,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,cursor:"pointer"}}>キャンセル</button>
-              </div>
-            </div>
-          ):(
-            <div style={{padding:"9px 14px"}}><button onClick={()=>setAdding(true)} style={{width:"100%",padding:"7px 0",borderRadius:8,fontSize:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.accent,cursor:"pointer"}}>+ 言葉を追加する</button></div>
-          )}
         </div>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>データ</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
@@ -731,6 +840,13 @@ export default function App(){
   const [todayRecord,setTodayRecord]=useState({am:null,pm:null});
   const [session,setSession]=useState(null);
   const [authReady,setAuthReady]=useState(false);
+  const [quotes,setQuotes]=useState([
+    {id:1,text:"小さな一歩が、やがて大きな道になる。",source:""},
+    {id:2,text:"完璧じゃなくていい。続けることが大切。",source:""},
+    {id:3,text:"今日の自分に、やさしくいよう。",source:""},
+    {id:4,text:"焦らなくていい。一歩ずつ、それがiPPO。",source:""},
+    {id:5,text:"今日も、ちゃんと生きた。",source:""},
+  ]);
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
@@ -746,9 +862,10 @@ export default function App(){
   useEffect(()=>{
     if(!authReady) return;
     if(!session){setScreen("main");return;}
-    loadAllRecords().then(recs=>{
+    Promise.all([loadAllRecords(), loadQuotes()]).then(([recs, dbQuotes])=>{
       setAllRecords(recs);
       setTodayRecord(recs[todayStr]||{am:null,pm:null});
+      if(dbQuotes !== null && dbQuotes.length > 0) setQuotes(dbQuotes);
       setScreen("main");
     });
   },[authReady,session]);
@@ -765,12 +882,13 @@ export default function App(){
     updated[todayStr][data.type]=data;
     setAllRecords(updated);
     setTodayRecord({...updated[todayStr]});
-    setScreen("done");
+    setScreen("main");
   };
 
   const showMenu=()=>setMenuOpen(true);
   const hideMenu=()=>setMenuOpen(false);
   const navTo=(id)=>{setSubScreen(id);setScreen("sub");};
+  const goHome=()=>{setScreen("main");setSubScreen(null);setMenuOpen(false);};
 
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
@@ -796,16 +914,17 @@ export default function App(){
 
   return(
     <Phone>
-      {menuOpen&&<SideMenu onNav={navTo} onClose={hideMenu}/>}
+      {menuOpen&&<SideMenu onNav={navTo} onClose={hideMenu} onTitle={goHome}/>}
       {screen==="main"&&(showDone
-        ?<DoneScreen onMenu={showMenu} todayRecord={todayRecord}/>
+        ?<DoneScreen onMenu={showMenu} todayRecord={todayRecord} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>
         :<MainScreen onRecord={()=>setScreen("record")} onMenu={showMenu} todayRecord={todayRecord}/>
       )}
       {screen==="record"&&<RecordScreen onDone={handleDone} onBack={()=>setScreen("main")} userId={session.user.id}/>}
-      {screen==="done"&&<DoneScreen onMenu={showMenu} todayRecord={todayRecord}/>}
-      {screen==="sub"&&subScreen==="calendar"&&<CalendarScreen onMenu={showMenu} allRecords={allRecords}/>}
-      {screen==="sub"&&subScreen==="insight"&&<InsightScreen onMenu={showMenu} allRecords={allRecords}/>}
-      {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu} onLogout={handleLogout}/>}
+      {screen==="done"&&<DoneScreen onMenu={showMenu} todayRecord={todayRecord} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>}
+      {screen==="sub"&&subScreen==="calendar"&&<CalendarScreen onMenu={showMenu} allRecords={allRecords} onTitle={goHome}/>}
+      {screen==="sub"&&subScreen==="insight"&&<InsightScreen onMenu={showMenu} allRecords={allRecords} onTitle={goHome}/>}
+      {screen==="sub"&&subScreen==="quotes"&&<CollectedWordsScreen onMenu={showMenu} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>}
+      {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu} onLogout={handleLogout} onTitle={goHome}/>}
     </Phone>
   );
 }
