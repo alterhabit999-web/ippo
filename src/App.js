@@ -71,13 +71,15 @@ async function deleteQuoteDB(id) {
   if (error) console.error("quote delete error:", error);
 }
 
-// 他ユーザーの言葉をランダムに1件取得
-async function loadRandomOtherQuote(userId) {
+// 他ユーザーの言葉をランダムに1件取得（自分の保有テキストと重複除外）
+async function loadRandomOtherQuote(userId, myTexts=[]) {
   const { data, error } = await supabase
     .from("quotes").select("id, text, source, user_id")
     .neq("user_id", userId).neq("source", "iPPO").limit(50);
   if (error || !data || data.length === 0) return null;
-  return data[Math.floor(Math.random() * data.length)];
+  const filtered = data.filter(q => !myTexts.includes(q.text));
+  if (filtered.length === 0) return null;
+  return filtered[Math.floor(Math.random() * filtered.length)];
 }
 
 // CSVエクスポート（Supabaseから取得）
@@ -706,7 +708,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
 
   const fetchOtherQuote=async()=>{
     setLoadingOther(true);
-    const q=await loadRandomOtherQuote(userId);
+    const q=await loadRandomOtherQuote(userId, quotes.map(q=>q.text));
     setOtherQuote(q);
     setLoadingOther(false);
   };
