@@ -39,8 +39,8 @@ async function loadAllRecords() {
 }
 
 // 記録をSupabaseにupsert
-async function saveRecord(data) {
-  const row = recordToRow(data);
+async function saveRecord(data, userId) {
+  const row = { ...recordToRow(data), user_id: userId };
   const { error } = await supabase.from("records").upsert(row, { onConflict: "date,type" });
   if (error) console.error("save error:", error);
 }
@@ -98,6 +98,56 @@ function getDaysInMonth(y,m){return new Date(y,m+1,0).getDate();}
 function getFirstDay(y,m){return new Date(y,m,1).getDay();}
 function toKey(y,m,d){return `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;}
 function avg(arr,key){const v=arr.map(d=>d[key]).filter(x=>x!=null&&!isNaN(x));return v.length?parseFloat((v.reduce((a,b)=>a+b,0)/v.length).toFixed(1)):null;}
+
+// ── ログイン画面 ──────────────────────────────────────
+function LoginScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!email || !password) { setMessage("メールアドレスとパスワードを入力してください"); return; }
+    setLoading(true);
+    setMessage("");
+    if (isSignUp) {
+      const { error } = await supabase.auth.signUp({ email, password });
+      if (error) setMessage(error.message);
+      else setMessage("確認メールを送りました。メールのリンクをクリックしてください。");
+    } else {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) setMessage("メールアドレスまたはパスワードが間違っています");
+    }
+    setLoading(false);
+  };
+
+  const inputStyle = {
+    width: "100%", padding: "12px 14px", fontSize: 14, borderRadius: 12,
+    border: `0.5px solid ${AM.border}`, background: AM.sub, color: AM.text,
+    outline: "none", boxSizing: "border-box", marginBottom: 12,
+  };
+
+  return (
+    <div style={{ width: "100%", minHeight: "100vh", background: AM.bgPage, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 32px", boxSizing: "border-box", fontFamily: "sans-serif" }}>
+      <div style={{ fontSize: 22, fontWeight: 500, letterSpacing: "0.14em", color: AM.text, fontFamily: "Georgia,serif", marginBottom: 8 }}>iPPO</div>
+      <div style={{ fontSize: 12, color: AM.textMuted, marginBottom: 40, letterSpacing: "0.06em" }}>毎日の小さな一歩を記録する</div>
+      <div style={{ width: "100%", maxWidth: 320 }}>
+        <input type="email" placeholder="メールアドレス" value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+        <input type="password" placeholder="パスワード" value={password} onChange={e => setPassword(e.target.value)} style={{ ...inputStyle, marginBottom: 20 }} onKeyDown={e => e.key === "Enter" && handleSubmit()} />
+        <button onClick={handleSubmit} disabled={loading}
+          style={{ width: "100%", padding: "13px 0", borderRadius: 12, background: loading ? AM.border : AM.accent, border: "none", cursor: loading ? "default" : "pointer", color: "#fff", fontSize: 14, fontWeight: 500, letterSpacing: "0.04em", marginBottom: 12 }}>
+          {loading ? "処理中..." : isSignUp ? "新規登録" : "ログイン"}
+        </button>
+        <button onClick={() => { setIsSignUp(p => !p); setMessage(""); }}
+          style={{ width: "100%", padding: "10px 0", borderRadius: 12, background: "transparent", border: `0.5px solid ${AM.border}`, cursor: "pointer", color: AM.textMuted, fontSize: 13 }}>
+          {isSignUp ? "ログインはこちら" : "アカウントをお持ちでない方"}
+        </button>
+        {message && <div style={{ marginTop: 16, fontSize: 12, color: AM.accent, textAlign: "center", lineHeight: 1.6 }}>{message}</div>}
+      </div>
+    </div>
+  );
+}
 
 // ── UI部品 ────────────────────────────────────────────
 function Phone({children}){
@@ -195,7 +245,7 @@ function MainScreen({onRecord,onMenu,todayRecord}){
   );
 }
 
-function RecordScreen({onDone,onBack}){
+function RecordScreen({onDone,onBack,userId}){
   const [sleepH,setSleepH]=useState("");
   const [sleepQ,setSleepQ]=useState(3);
   const [mood,setMood]=useState(3);
@@ -214,7 +264,7 @@ function RecordScreen({onDone,onBack}){
     const data=isAM
       ?{date:todayStr,type:"am",sleepH:parseFloat(sleepH)||null,sleepQ,mood,condition,promise}
       :{date:todayStr,type:"pm",mood:pmMood,energy,stress,happy,moya,promise:tmPromise};
-    await saveRecord(data);
+    await saveRecord(data, userId);
     setSaving(false);
     onDone(data);
   };
@@ -569,7 +619,7 @@ function InsightScreen({onMenu,allRecords}){
   );
 }
 
-function SettingsScreen({onMenu}){
+function SettingsScreen({onMenu,onLogout}){
   const [amTime,setAmTime]=useState("07:00");
   const [pmTime,setPmTime]=useState("22:00");
   const [amOn,setAmOn]=useState(true);
@@ -651,12 +701,19 @@ function SettingsScreen({onMenu}){
           )}
         </div>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>データ</div>
-        <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden"}}>
+        <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",cursor:"pointer"}} onClick={handleExport}>
             <div>
               <div style={{fontSize:13,color:T.text}}>CSVでエクスポート</div>
               <div style={{fontSize:11,color:exportMsg?T.accent:T.textMuted,marginTop:2}}>{exportMsg||"記録データをファイルに書き出す"}</div>
             </div>
+            <span style={{fontSize:14,color:T.textMuted}}>›</span>
+          </div>
+        </div>
+        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>アカウント</div>
+        <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden"}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",cursor:"pointer"}} onClick={onLogout}>
+            <div style={{fontSize:13,color:T.text}}>ログアウト</div>
             <span style={{fontSize:14,color:T.textMuted}}>›</span>
           </div>
         </div>
@@ -672,14 +729,35 @@ export default function App(){
   const [menuOpen,setMenuOpen]=useState(false);
   const [allRecords,setAllRecords]=useState({});
   const [todayRecord,setTodayRecord]=useState({am:null,pm:null});
+  const [session,setSession]=useState(null);
+  const [authReady,setAuthReady]=useState(false);
 
   useEffect(()=>{
+    supabase.auth.getSession().then(({data:{session}})=>{
+      setSession(session);
+      setAuthReady(true);
+    });
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>{
+      setSession(session);
+    });
+    return ()=>subscription.unsubscribe();
+  },[]);
+
+  useEffect(()=>{
+    if(!authReady) return;
+    if(!session){setScreen("main");return;}
     loadAllRecords().then(recs=>{
       setAllRecords(recs);
       setTodayRecord(recs[todayStr]||{am:null,pm:null});
       setScreen("main");
     });
-  },[]);
+  },[authReady,session]);
+
+  const handleLogout=async()=>{
+    await supabase.auth.signOut();
+    setAllRecords({});
+    setTodayRecord({am:null,pm:null});
+  };
 
   const handleDone=(data)=>{
     const updated={...allRecords};
@@ -698,6 +776,16 @@ export default function App(){
   const pmDone=todayRecord?.pm!=null;
   const showDone=(isAM&&amDone)||(!isAM&&pmDone)||(amDone&&pmDone);
 
+  if(!authReady) return(
+    <Phone>
+      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:T.bgPage}}>
+        <span style={{fontSize:15,color:T.textMuted,fontFamily:"Georgia,serif",letterSpacing:"0.1em"}}>iPPO</span>
+      </div>
+    </Phone>
+  );
+
+  if(!session) return <LoginScreen/>;
+
   if(screen==="loading") return(
     <Phone>
       <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:T.bgPage}}>
@@ -713,11 +801,11 @@ export default function App(){
         ?<DoneScreen onMenu={showMenu} todayRecord={todayRecord}/>
         :<MainScreen onRecord={()=>setScreen("record")} onMenu={showMenu} todayRecord={todayRecord}/>
       )}
-      {screen==="record"&&<RecordScreen onDone={handleDone} onBack={()=>setScreen("main")}/>}
+      {screen==="record"&&<RecordScreen onDone={handleDone} onBack={()=>setScreen("main")} userId={session.user.id}/>}
       {screen==="done"&&<DoneScreen onMenu={showMenu} todayRecord={todayRecord}/>}
       {screen==="sub"&&subScreen==="calendar"&&<CalendarScreen onMenu={showMenu} allRecords={allRecords}/>}
       {screen==="sub"&&subScreen==="insight"&&<InsightScreen onMenu={showMenu} allRecords={allRecords}/>}
-      {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu}/>}
+      {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu} onLogout={handleLogout}/>}
     </Phone>
   );
 }
