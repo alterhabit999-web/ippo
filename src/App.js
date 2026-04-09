@@ -45,9 +45,9 @@ async function saveRecord(data, userId) {
   if (error) console.error("save error:", error);
 }
 
-// あつめた言葉をSupabaseから取得
-async function loadQuotes() {
-  const { data, error } = await supabase.from("quotes").select("*").order("created_at", { ascending: true });
+// あつめた言葉をSupabaseから取得（自分のみ）
+async function loadQuotes(userId) {
+  const { data, error } = await supabase.from("quotes").select("*").eq("user_id", userId).order("created_at", { ascending: true });
   if (error) { console.error("quotes load error:", error); return null; }
   return data.map(row => ({ id: row.id, text: row.text, source: row.source || "" }));
 }
@@ -925,7 +925,7 @@ export default function App(){
     if(!authReady) return;
     if(!session){setScreen("main");return;}
     (async()=>{
-      const [recs, dbQuotes] = await Promise.all([loadAllRecords(), loadQuotes()]);
+      const [recs, dbQuotes] = await Promise.all([loadAllRecords(), loadQuotes(session.user.id)]);
       setAllRecords(recs);
       setTodayRecord(recs[todayStr]||{am:null,pm:null});
       if(dbQuotes !== null) {
