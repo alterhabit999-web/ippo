@@ -71,6 +71,15 @@ async function deleteQuoteDB(id) {
   if (error) console.error("quote delete error:", error);
 }
 
+// 他ユーザーの言葉をランダムに1件取得
+async function loadRandomOtherQuote(userId) {
+  const { data, error } = await supabase
+    .from("quotes").select("id, text, source, user_id")
+    .neq("user_id", userId).limit(50);
+  if (error || !data || data.length === 0) return null;
+  return data[Math.floor(Math.random() * data.length)];
+}
+
 // CSVエクスポート（Supabaseから取得）
 async function exportCSV() {
   const recs = await loadAllRecords();
@@ -681,18 +690,67 @@ function InsightScreen({onMenu,allRecords,onTitle}){
 }
 
 function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
-  const [adding,setAdding]=useState(false);
+  const [showAdd,setShowAdd]=useState(false);
   const [newText,setNewText]=useState("");
   const [newSource,setNewSource]=useState("");
+  const [savingNew,setSavingNew]=useState(false);
   const [editId,setEditId]=useState(null);
   const [editText,setEditText]=useState("");
   const [editSource,setEditSource]=useState("");
   const [featuredIdx,setFeaturedIdx]=useState(()=>Math.floor(Math.random()*Math.max(quotes.length,1)));
+  const [otherQuote,setOtherQuote]=useState(null);
+  const [loadingOther,setLoadingOther]=useState(true);
+  const [addingOther,setAddingOther]=useState(false);
 
   const featured=quotes.length>0?quotes[featuredIdx%quotes.length]:null;
 
+  const fetchOtherQuote=async()=>{
+    setLoadingOther(true);
+    const q=await loadRandomOtherQuote(userId);
+    setOtherQuote(q);
+    setLoadingOther(false);
+  };
+  useEffect(()=>{fetchOtherQuote();},[]);
+
+  const handleAddNew=async()=>{
+    if(!newText.trim()) return;
+    setSavingNew(true);
+    const saved=await insertQuote(newText.trim(),newSource.trim(),userId);
+    if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+    setSavingNew(false);
+    setNewText("");setNewSource("");setShowAdd(false);
+  };
+
+  const handleAddOther=async()=>{
+    if(!otherQuote||addingOther) return;
+    setAddingOther(true);
+    const saved=await insertQuote(otherQuote.text,otherQuote.source||"",userId);
+    if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+    setAddingOther(false);
+    fetchOtherQuote();
+  };
+
   return(
     <>
+      {/* 言葉追加モーダル */}
+      {showAdd&&(
+        <div style={{position:"absolute",inset:0,zIndex:60,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}} onClick={()=>setShowAdd(false)}>
+          <div onClick={e=>e.stopPropagation()}
+            style={{width:"100%",background:T.bg,borderRadius:"20px",border:`0.5px solid ${T.border}`,padding:"20px 20px 24px",maxHeight:"65vh",overflowY:"auto",boxSizing:"border-box"}}>
+            <div style={{fontSize:14,fontWeight:500,color:T.text,fontFamily:"Georgia,serif",marginBottom:16}}>言葉をあつめる</div>
+            <textarea value={newText} onChange={e=>setNewText(e.target.value)} placeholder="言葉を入力..." rows={3}
+              style={{width:"100%",fontSize:13,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"10px 12px",resize:"none",outline:"none",lineHeight:1.7,boxSizing:"border-box",marginBottom:10}}/>
+            <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧"
+              style={{width:"100%",fontSize:12,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"9px 12px",outline:"none",boxSizing:"border-box",marginBottom:16}}/>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={handleAddNew} disabled={savingNew}
+                style={{flex:1,padding:"12px 0",borderRadius:12,background:savingNew?T.border:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:500,cursor:savingNew?"default":"pointer"}}>{savingNew?"保存中...":"保存する"}</button>
+              <button onClick={()=>setShowAdd(false)} disabled={savingNew}
+                style={{padding:"12px 16px",borderRadius:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,fontSize:13,cursor:"pointer"}}>キャンセル</button>
+            </div>
+          </div>
+        </div>
+      )}
       <TopBar onMenu={onMenu} onTitle={onTitle}/>
       <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1,background:T.bgPage}}>
         {/* フィーチャー言葉 */}
@@ -706,13 +764,34 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
           </div>
         )}
 
+        {/* みんなの言葉 */}
+        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>みんなの言葉</div>
+        <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,padding:"14px",marginBottom:18}}>
+          {loadingOther?(
+            <div style={{textAlign:"center",padding:"12px 0",fontSize:12,color:T.textMuted}}>読み込み中...</div>
+          ):otherQuote?(
+            <>
+              <div style={{fontSize:13,color:T.text,lineHeight:1.9,fontFamily:"Georgia,serif",whiteSpace:"pre-line",marginBottom:6}}>"{otherQuote.text}"</div>
+              {otherQuote.source&&<div style={{fontSize:11,color:T.textMuted,marginBottom:12}}>— {otherQuote.source}</div>}
+              <div style={{display:"flex",gap:8}}>
+                <button onClick={handleAddOther} disabled={addingOther}
+                  style={{flex:1,padding:"9px 0",borderRadius:10,background:addingOther?T.border:T.accent,border:"none",color:"#fff",fontSize:12,fontWeight:500,cursor:addingOther?"default":"pointer"}}>{addingOther?"追加中...":"＋ 自分の言葉に追加する"}</button>
+                <button onClick={fetchOtherQuote} disabled={loadingOther}
+                  style={{padding:"9px 14px",borderRadius:10,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,fontSize:12,cursor:"pointer"}}>他の言葉</button>
+              </div>
+            </>
+          ):(
+            <div style={{textAlign:"center",padding:"12px 0",fontSize:12,color:T.textMuted}}>他のユーザーの言葉はまだありません</div>
+          )}
+        </div>
+
         {/* 言葉一覧 */}
-        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>すべての言葉 ({quotes.length})</div>
+        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>あつめた言葉たち ({quotes.length})</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
           {quotes.length===0&&(
             <div style={{padding:"20px 14px",fontSize:13,color:T.textMuted,textAlign:"center"}}>まだ言葉がありません</div>
           )}
-          {quotes.map((q,idx)=>(
+          {quotes.map((q)=>(
             <div key={q.id} style={{padding:"11px 14px",borderBottom:`0.5px solid ${T.border}`}}>
               {editId===q.id?(
                 <div style={{display:"flex",flexDirection:"column",gap:7}}>
@@ -739,36 +818,16 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
                     <div style={{fontSize:12,color:T.text,lineHeight:1.7}}>"{q.text}"</div>
                     {q.source&&<div style={{fontSize:10,color:T.textMuted,marginTop:2}}>— {q.source}</div>}
                   </div>
-                  {!q.isDefault&&<button onClick={()=>{setEditId(q.id);setEditText(q.text);setEditSource(q.source||"");}}
-                    style={{background:"none",border:`0.5px solid ${T.border}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.textMuted,cursor:"pointer",flexShrink:0}}>編集</button>}
+                  <button onClick={()=>{setEditId(q.id);setEditText(q.text);setEditSource(q.source||"");}}
+                    style={{background:"none",border:`0.5px solid ${T.border}`,borderRadius:6,padding:"3px 9px",fontSize:10,color:T.textMuted,cursor:"pointer",flexShrink:0}}>編集</button>
                 </div>
               )}
             </div>
           ))}
-          {/* 追加フォーム */}
-          {adding?(
-            <div style={{padding:"11px 14px",display:"flex",flexDirection:"column",gap:7}}>
-              <textarea value={newText} onChange={e=>setNewText(e.target.value)} placeholder="言葉を入力..." rows={2}
-                style={{fontSize:12,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"7px 10px",resize:"none",outline:"none",lineHeight:1.6,width:"100%",boxSizing:"border-box"}}/>
-              <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧"
-                style={{fontSize:11,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"6px 10px",outline:"none",width:"100%",boxSizing:"border-box"}}/>
-              <div style={{display:"flex",gap:7}}>
-                <button onClick={async()=>{
-                  if(!newText.trim())return;
-                  const saved=await insertQuote(newText.trim(),newSource.trim(),userId);
-                  if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
-                  setNewText("");setNewSource("");setAdding(false);
-                }} style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,background:T.accent,border:"none",color:"#fff",cursor:"pointer"}}>追加する</button>
-                <button onClick={()=>{setAdding(false);setNewText("");setNewSource("");}}
-                  style={{padding:"6px 12px",borderRadius:8,fontSize:11,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,cursor:"pointer"}}>キャンセル</button>
-              </div>
-            </div>
-          ):(
-            <div style={{padding:"9px 14px"}}>
-              <button onClick={()=>setAdding(true)}
-                style={{width:"100%",padding:"7px 0",borderRadius:8,fontSize:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.accent,cursor:"pointer"}}>+ 言葉を追加する</button>
-            </div>
-          )}
+          <div style={{padding:"9px 14px"}}>
+            <button onClick={()=>setShowAdd(true)}
+              style={{width:"100%",padding:"7px 0",borderRadius:8,fontSize:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.accent,cursor:"pointer"}}>+ 言葉を追加する</button>
+          </div>
         </div>
       </div>
     </>
@@ -831,13 +890,13 @@ function SettingsScreen({onMenu,onLogout,onTitle}){
   );
 }
 
-// ── デフォルト言葉（常に保持） ────────────────────────
-const DEFAULT_QUOTES = [
-  {id:"default-1",text:"小さな一歩が、やがて大きな道になる。",source:"",isDefault:true},
-  {id:"default-2",text:"完璧じゃなくていい。続けることが大切。",source:"",isDefault:true},
-  {id:"default-3",text:"今日の自分に、やさしくいよう。",source:"",isDefault:true},
-  {id:"default-4",text:"焦らなくていい。一歩ずつ、それがiPPO。",source:"",isDefault:true},
-  {id:"default-5",text:"今日も、ちゃんと生きた。",source:"",isDefault:true},
+// ── デフォルト言葉（初回DBシード用） ─────────────────
+const DEFAULT_QUOTES_DATA = [
+  {text:"小さな一歩が、やがて大きな道になる。",source:"iPPO"},
+  {text:"完璧じゃなくていい。続けることが大切。",source:"iPPO"},
+  {text:"今日の自分に、やさしくいよう。",source:"iPPO"},
+  {text:"焦らなくていい。一歩ずつ、それがiPPO。",source:"iPPO"},
+  {text:"今日も、ちゃんと生きた。",source:"iPPO"},
 ];
 
 // ── App ───────────────────────────────────────────────
@@ -849,7 +908,7 @@ export default function App(){
   const [todayRecord,setTodayRecord]=useState({am:null,pm:null});
   const [session,setSession]=useState(null);
   const [authReady,setAuthReady]=useState(false);
-  const [quotes,setQuotes]=useState(DEFAULT_QUOTES);
+  const [quotes,setQuotes]=useState([]);
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
@@ -865,12 +924,23 @@ export default function App(){
   useEffect(()=>{
     if(!authReady) return;
     if(!session){setScreen("main");return;}
-    Promise.all([loadAllRecords(), loadQuotes()]).then(([recs, dbQuotes])=>{
+    (async()=>{
+      const [recs, dbQuotes] = await Promise.all([loadAllRecords(), loadQuotes()]);
       setAllRecords(recs);
       setTodayRecord(recs[todayStr]||{am:null,pm:null});
-      if(dbQuotes !== null) setQuotes([...DEFAULT_QUOTES, ...dbQuotes]);
+      if(dbQuotes !== null) {
+        const hasDefaults = dbQuotes.some(q => q.source === "iPPO");
+        if(!hasDefaults) {
+          // 初回またはデフォルト未登録ならDBにシード
+          const seeded = await Promise.all(DEFAULT_QUOTES_DATA.map(q => insertQuote(q.text, q.source, session.user.id)));
+          const validSeeded = seeded.filter(Boolean).map(row => ({id:row.id, text:row.text, source:row.source||""}));
+          setQuotes([...validSeeded, ...dbQuotes]);
+        } else {
+          setQuotes(dbQuotes);
+        }
+      }
       setScreen("main");
-    });
+    })();
   },[authReady,session]);
 
   const handleLogout=async()=>{
