@@ -12,6 +12,21 @@ html, body, #root {
   min-height: 100dvh;
 }
 
+@keyframes ippoBlob1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%       { transform: translate(28px, -22px) scale(1.04); }
+  66%       { transform: translate(-18px, 18px) scale(0.97); }
+}
+@keyframes ippoBlob2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  40%      { transform: translate(-26px, 16px) scale(1.03); }
+  70%      { transform: translate(18px, -18px) scale(0.96); }
+}
+@keyframes ippoBlob3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-16px, 28px) scale(1.05); }
+}
+
 .App {
   text-align: center;
 }

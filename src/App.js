@@ -195,7 +195,28 @@ function Phone({children}){
     const meta=document.querySelector('meta[name="theme-color"]');
     if(meta) meta.setAttribute('content', T.bgPage);
   },[]);
-  return <div style={{width:"100%",minHeight:"100dvh",background:T.bgPage,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative",fontFamily:"sans-serif"}}>{children}</div>;
+  const c1=isAM?"#F0A060":"#5A8AAA";
+  const c2=isAM?"#D45F10":"#2E3840";
+  return(
+    <div style={{width:"100%",minHeight:"100dvh",background:T.bgPage,overflow:"hidden",position:"relative",fontFamily:"sans-serif"}}>
+      {/* 背景アニメーション（transform のみ・GPU描画） */}
+      <div aria-hidden="true" style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
+        <div style={{position:"absolute",width:"75vw",height:"75vw",borderRadius:"50%",
+          background:`radial-gradient(circle, ${c1}2E 0%, transparent 70%)`,
+          top:"-20%",left:"-20%",animation:"ippoBlob1 22s ease-in-out infinite"}}/>
+        <div style={{position:"absolute",width:"70vw",height:"70vw",borderRadius:"50%",
+          background:`radial-gradient(circle, ${c2}1F 0%, transparent 70%)`,
+          bottom:"-20%",right:"-15%",animation:"ippoBlob2 28s ease-in-out infinite"}}/>
+        <div style={{position:"absolute",width:"50vw",height:"50vw",borderRadius:"50%",
+          background:`radial-gradient(circle, ${c1}18 0%, transparent 70%)`,
+          top:"38%",right:"-5%",animation:"ippoBlob3 19s ease-in-out infinite"}}/>
+      </div>
+      {/* コンテンツ */}
+      <div style={{position:"relative",display:"flex",flexDirection:"column",minHeight:"100dvh"}}>
+        {children}
+      </div>
+    </div>
+  );
 }
 function Hamburger({onOpen}){
   return(
