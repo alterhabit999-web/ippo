@@ -195,24 +195,28 @@ function Phone({children}){
     const meta=document.querySelector('meta[name="theme-color"]');
     if(meta) meta.setAttribute('content', T.bgPage);
   },[]);
-  const c1=isAM?"#F0A060":"#5A8AAA";
-  const c2=isAM?"#EEC898":"#A8C8D8";
+  // 横波グラデーション（画面幅の3倍・波の山が中央にあり左右に流れる）
+  const hWave = isAM
+    ? "linear-gradient(90deg,#FFF4E8 0%,#FFF4E8 15%,#FFE8CC 35%,#F0C090 50%,#FFE8CC 65%,#FFF4E8 85%,#FFF4E8 100%)"
+    : "linear-gradient(90deg,#1A2028 0%,#1A2028 15%,#222C3C 35%,#2A3C52 50%,#222C3C 65%,#1A2028 85%,#1A2028 100%)";
+  // 縦波グラデーション（画面高さの3倍・奥行きを出す）
+  const vWave = isAM
+    ? "linear-gradient(180deg,#FFF4E8 0%,#FDEEE0 30%,#FFF4E8 60%,#FFF0E2 100%)"
+    : "linear-gradient(180deg,#1A2028 0%,#1D2936 30%,#1A2028 60%,#1E2A38 100%)";
   return(
     <div style={{width:"100%",minHeight:"100dvh",background:T.bgPage,overflow:"hidden",position:"relative",fontFamily:"sans-serif"}}>
-      {/* 背景アニメーション（transform のみ・GPU描画） */}
-      <div aria-hidden="true" style={{position:"absolute",inset:0,pointerEvents:"none",overflow:"hidden"}}>
-        <div style={{position:"absolute",width:"75vw",height:"75vw",borderRadius:"50%",
-          background:`radial-gradient(circle, ${c1}55 0%, transparent 70%)`,
-          top:"-20%",left:"-20%",animation:"ippoBlob1 22s ease-in-out infinite"}}/>
-        <div style={{position:"absolute",width:"70vw",height:"70vw",borderRadius:"50%",
-          background:`radial-gradient(circle, ${c2}44 0%, transparent 70%)`,
-          bottom:"-20%",right:"-15%",animation:"ippoBlob2 28s ease-in-out infinite"}}/>
-        <div style={{position:"absolute",width:"50vw",height:"50vw",borderRadius:"50%",
-          background:`radial-gradient(circle, ${c1}33 0%, transparent 70%)`,
-          top:"38%",right:"-5%",animation:"ippoBlob3 19s ease-in-out infinite"}}/>
-      </div>
+      {/* 横波レイヤー（メインの波・左右に行き来） */}
+      <div aria-hidden="true" style={{
+        position:"absolute",top:0,left:"-100%",width:"300%",height:"100%",
+        background:hWave,pointerEvents:"none",
+        animation:"ippoWaveH 14s ease-in-out infinite alternate"}}/>
+      {/* 縦波レイヤー（奥行き・上下に行き来） */}
+      <div aria-hidden="true" style={{
+        position:"absolute",top:"-100%",left:0,width:"100%",height:"300%",
+        background:vWave,opacity:0.55,pointerEvents:"none",
+        animation:"ippoWaveV 22s ease-in-out infinite alternate-reverse"}}/>
       {/* コンテンツ */}
-      <div style={{position:"relative",display:"flex",flexDirection:"column",minHeight:"100dvh"}}>
+      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",minHeight:"100dvh"}}>
         {children}
       </div>
     </div>
@@ -283,7 +287,7 @@ function MainScreen({onRecord,onMenu,todayRecord}){
   const pmDone=todayRecord?.pm!=null;
   const canRecord=isAM?!amDone:!pmDone;
   return(
-    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 32px 56px",background:T.bgPage}}>
+    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 32px 56px"}}>
       <span style={{fontSize:18,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",marginBottom:48}}>iPPO</span>
       <div style={{fontSize:12,color:T.textMuted,marginBottom:20,letterSpacing:"0.06em"}}>{dateStr}</div>
       {canRecord?(
@@ -448,12 +452,12 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
           </div>
         </div>
       )}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 10px",background:T.bgPage}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 10px"}}>
         <Hamburger onOpen={onMenu}/>
         <span onClick={onTitle} style={{fontSize:15,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",cursor:onTitle?"pointer":"default"}}>iPPO</span>
         <div style={{width:26}}/>
       </div>
-      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 28px 48px",gap:24,background:T.bgPage}}>
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 28px 48px",gap:24}}>
         <div style={{width:44,height:44,borderRadius:"50%",background:T.sub,border:`1px solid ${T.accentLight}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
           <div style={{width:12,height:12,borderRadius:"50%",background:T.accent}}/>
         </div>

@@ -12,19 +12,15 @@ html, body, #root {
   min-height: 100dvh;
 }
 
-@keyframes ippoBlob1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33%       { transform: translate(28px, -22px) scale(1.04); }
-  66%       { transform: translate(-18px, 18px) scale(0.97); }
+/* 横方向の波：ゆっくり左右に行き来 */
+@keyframes ippoWaveH {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(33.33%); }
 }
-@keyframes ippoBlob2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  40%      { transform: translate(-26px, 16px) scale(1.03); }
-  70%      { transform: translate(18px, -18px) scale(0.96); }
-}
-@keyframes ippoBlob3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50%      { transform: translate(-16px, 28px) scale(1.05); }
+/* 縦方向の波：補助的な奥行き */
+@keyframes ippoWaveV {
+  0%   { transform: translateY(0); }
+  100% { transform: translateY(33.33%); }
 }
 
 .App {
