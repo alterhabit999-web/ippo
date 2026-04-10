@@ -42,7 +42,8 @@ async function loadAllRecords() {
 async function saveRecord(data, userId) {
   const row = { ...recordToRow(data), user_id: userId };
   const { error } = await supabase.from("records").upsert(row, { onConflict: "user_id,date,type" });
-  if (error) console.error("save error:", error);
+  if (error) { console.error("save error:", error); return error; }
+  return null;
 }
 
 // あつめた言葉をSupabaseから取得（自分のみ）
@@ -301,14 +302,20 @@ function RecordScreen({onDone,onBack,userId}){
   const [moya,setMoya]=useState("");
   const [tmPromise,setTmPromise]=useState("");
   const [saving,setSaving]=useState(false);
+  const [saveError,setSaveError]=useState("");
 
   const handleSave=async()=>{
     setSaving(true);
+    setSaveError("");
     const data=isAM
       ?{date:todayStr,type:"am",sleepH:parseFloat(sleepH)||null,sleepQ,mood,condition,promise}
       :{date:todayStr,type:"pm",mood:pmMood,energy,stress,happy,moya,promise:tmPromise};
-    await saveRecord(data, userId);
+    const err=await saveRecord(data, userId);
     setSaving(false);
+    if(err){
+      setSaveError(`保存エラー: ${err.message||err.code||JSON.stringify(err)}`);
+      return;
+    }
     onDone(data);
   };
 
@@ -369,6 +376,7 @@ function RecordScreen({onDone,onBack,userId}){
             </div>
           </>
         )}
+        {saveError&&<div style={{marginBottom:12,padding:"10px 12px",borderRadius:10,background:"#FEE2E2",border:"1px solid #FECACA",color:"#991B1B",fontSize:12,lineHeight:1.6}}>{saveError}</div>}
         <button onClick={handleSave} disabled={saving}
           style={{width:"100%",padding:"13px 0",borderRadius:12,marginTop:4,background:saving?T.border:T.accent,border:"none",cursor:saving?"default":"pointer",color:"#fff",fontSize:14,fontWeight:500,letterSpacing:"0.04em"}}>
           {saving?"保存中...":"記録する"}
