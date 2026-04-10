@@ -188,7 +188,13 @@ function LoginScreen() {
 
 // ── UI部品 ────────────────────────────────────────────
 function Phone({children}){
-  return <div style={{width:"100%",minHeight:"100vh",background:T.bg,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative",fontFamily:"sans-serif"}}>{children}</div>;
+  useEffect(()=>{
+    document.body.style.background=T.bgPage;
+    document.documentElement.style.background=T.bgPage;
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', T.bgPage);
+  },[]);
+  return <div style={{width:"100%",minHeight:"100dvh",background:T.bgPage,display:"flex",flexDirection:"column",overflow:"hidden",position:"relative",fontFamily:"sans-serif"}}>{children}</div>;
 }
 function Hamburger({onOpen}){
   return(
@@ -426,6 +432,7 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
           <div style={{fontSize:10,letterSpacing:"0.12em",color:T.accent,marginBottom:16,fontWeight:500}}>{isAM?"今日の朝に":"今日の夜に"}</div>
           <div style={{fontSize:15,color:T.text,lineHeight:2,fontFamily:"Georgia,serif",whiteSpace:"pre-line"}}>"{q.text}"</div>
           {q.sub&&<div style={{fontSize:12,color:T.textMuted,lineHeight:1.8,fontFamily:"Georgia,serif",marginTop:8}}>{q.sub}</div>}
+          {q.source&&<div style={{fontSize:11,color:T.textMuted,marginTop:6,fontFamily:"Georgia,serif"}}>— {q.source}</div>}
         </div>
         <div style={{fontSize:10,color:T.textMuted}}>{dateStr}の記録が完了しました</div>
         <div style={{display:"flex",gap:12}}>
@@ -692,6 +699,7 @@ function InsightScreen({onMenu,allRecords,onTitle}){
 }
 
 function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
+  const PAGE_SIZE=10;
   const [showAdd,setShowAdd]=useState(false);
   const [newText,setNewText]=useState("");
   const [newSource,setNewSource]=useState("");
@@ -699,6 +707,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
   const [editId,setEditId]=useState(null);
   const [editText,setEditText]=useState("");
   const [editSource,setEditSource]=useState("");
+  const [page,setPage]=useState(0);
   const [featuredIdx,setFeaturedIdx]=useState(()=>Math.floor(Math.random()*Math.max(quotes.length,1)));
   const [otherQuote,setOtherQuote]=useState(null);
   const [loadingOther,setLoadingOther]=useState(true);
@@ -789,12 +798,28 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
         </div>
 
         {/* 言葉一覧 */}
-        <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>あつめた言葉たち ({quotes.length})</div>
+        {(()=>{
+          const totalPages=Math.max(1,Math.ceil(quotes.length/PAGE_SIZE));
+          const pagedQuotes=quotes.slice(page*PAGE_SIZE,(page+1)*PAGE_SIZE);
+          return(
+        <>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+          <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent}}>あつめた言葉たち ({quotes.length})</div>
+          {totalPages>1&&(
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>setPage(p=>Math.max(0,p-1))} disabled={page===0}
+                style={{background:"none",border:"none",fontSize:16,color:page===0?T.border:T.textMuted,cursor:page===0?"default":"pointer",padding:"0 2px",lineHeight:1}}>‹</button>
+              <span style={{fontSize:10,color:T.textMuted}}>{page+1} / {totalPages}</span>
+              <button onClick={()=>setPage(p=>Math.min(totalPages-1,p+1))} disabled={page===totalPages-1}
+                style={{background:"none",border:"none",fontSize:16,color:page===totalPages-1?T.border:T.textMuted,cursor:page===totalPages-1?"default":"pointer",padding:"0 2px",lineHeight:1}}>›</button>
+            </div>
+          )}
+        </div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
           {quotes.length===0&&(
             <div style={{padding:"20px 14px",fontSize:13,color:T.textMuted,textAlign:"center"}}>まだ言葉がありません</div>
           )}
-          {quotes.map((q)=>(
+          {pagedQuotes.map((q)=>(
             <div key={q.id} style={{padding:"11px 14px",borderBottom:`0.5px solid ${T.border}`}}>
               {editId===q.id?(
                 <div style={{display:"flex",flexDirection:"column",gap:7}}>
@@ -832,6 +857,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
               style={{width:"100%",padding:"7px 0",borderRadius:8,fontSize:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.accent,cursor:"pointer"}}>+ 言葉を追加する</button>
           </div>
         </div>
+        </>);})()}
       </div>
     </>
   );
