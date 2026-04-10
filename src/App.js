@@ -958,26 +958,30 @@ export default function App(){
     return ()=>subscription.unsubscribe();
   },[]);
 
+  const fetchData=async(userId)=>{
+    const [recs, dbQuotes] = await Promise.all([loadAllRecords(), loadQuotes(userId)]);
+    setAllRecords(recs);
+    setTodayRecord(recs[todayStr]||{am:null,pm:null});
+    if(dbQuotes !== null) {
+      const hasDefaults = dbQuotes.some(q => q.source === "iPPO");
+      if(!hasDefaults) {
+        const seeded = await Promise.all(DEFAULT_QUOTES_DATA.map(q => insertQuote(q.text, q.source, userId)));
+        const validSeeded = seeded.filter(Boolean).map(row => ({id:row.id, text:row.text, source:row.source||""}));
+        setQuotes([...validSeeded, ...dbQuotes]);
+      } else {
+        setQuotes(dbQuotes);
+      }
+    }
+  };
+
   useEffect(()=>{
     if(!authReady) return;
     if(!session){setScreen("main");return;}
     (async()=>{
-      const [recs, dbQuotes] = await Promise.all([loadAllRecords(), loadQuotes(session.user.id)]);
-      setAllRecords(recs);
-      setTodayRecord(recs[todayStr]||{am:null,pm:null});
-      if(dbQuotes !== null) {
-        const hasDefaults = dbQuotes.some(q => q.source === "iPPO");
-        if(!hasDefaults) {
-          // 初回またはデフォルト未登録ならDBにシード
-          const seeded = await Promise.all(DEFAULT_QUOTES_DATA.map(q => insertQuote(q.text, q.source, session.user.id)));
-          const validSeeded = seeded.filter(Boolean).map(row => ({id:row.id, text:row.text, source:row.source||""}));
-          setQuotes([...validSeeded, ...dbQuotes]);
-        } else {
-          setQuotes(dbQuotes);
-        }
-      }
+      await fetchData(session.user.id);
       setScreen("main");
     })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   },[authReady,session]);
 
   const handleLogout=async()=>{
@@ -998,7 +1002,10 @@ export default function App(){
   const showMenu=()=>setMenuOpen(true);
   const hideMenu=()=>setMenuOpen(false);
   const navTo=(id)=>{setSubScreen(id);setScreen("sub");};
-  const goHome=()=>{setScreen("main");setSubScreen(null);setMenuOpen(false);};
+  const goHome=async()=>{
+    setScreen("main");setSubScreen(null);setMenuOpen(false);
+    if(session) await fetchData(session.user.id);
+  };
 
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
