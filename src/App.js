@@ -362,7 +362,7 @@ function MainScreen({onRecord,onMenu,todayRecord}){
   );
 }
 
-function RecordScreen({onDone,onBack,userId}){
+function RecordScreen({onDone,onBack,onMenu,userId}){
   const [sleepH,setSleepH]=useState("");
   const [sleepQ,setSleepQ]=useState(3);
   const [mood,setMood]=useState(3);
@@ -395,9 +395,9 @@ function RecordScreen({onDone,onBack,userId}){
   return(
     <>
       <div style={{borderBottom:`0.5px solid ${T.border}`,display:"flex",alignItems:"center",padding:"16px 20px 12px",gap:8}}>
-        <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:T.textMuted,padding:0,lineHeight:1}}>←</button>
+        <Hamburger onOpen={onMenu}/>
         <span style={{fontSize:12,color:T.textMuted,flex:1,textAlign:"center",letterSpacing:"0.05em"}}>{dateStr}　{isAM?"朝":"夜"}の記録</span>
-        <div style={{width:24}}/>
+        <div style={{width:26}}/>
       </div>
       <div style={{flex:1,overflowY:"auto",padding:"18px 22px 24px",background:T.bg}}>
         {isAM?(
@@ -1118,7 +1118,7 @@ export default function App(){
         ?<DoneScreen onMenu={showMenu} todayRecord={todayRecord} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>
         :<MainScreen onRecord={()=>setScreen("record")} onMenu={showMenu} todayRecord={todayRecord}/>
       )}
-      {screen==="record"&&<RecordScreen onDone={handleDone} onBack={()=>setScreen("main")} userId={session.user.id}/>}
+      {screen==="record"&&<RecordScreen onDone={handleDone} onBack={()=>setScreen("main")} onMenu={showMenu} userId={session.user.id}/>}
       {screen==="done"&&<DoneScreen onMenu={showMenu} todayRecord={todayRecord} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>}
       {screen==="sub"&&subScreen==="calendar"&&<CalendarScreen onMenu={showMenu} allRecords={allRecords} onTitle={goHome}/>}
       {screen==="sub"&&subScreen==="insight"&&<InsightScreen onMenu={showMenu} allRecords={allRecords} onTitle={goHome}/>}
