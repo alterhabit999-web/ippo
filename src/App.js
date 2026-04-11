@@ -27,8 +27,8 @@ function recordToRow(data) {
 }
 
 // 全記録をSupabaseから取得 → { "YYYY-MM-DD": { am, pm } } 形式に変換
-async function loadAllRecords() {
-  const { data, error } = await supabase.from("records").select("*").order("date", { ascending: true });
+async function loadAllRecords(userId) {
+  const { data, error } = await supabase.from("records").select("*").eq("user_id", userId).order("date", { ascending: true });
   if (error) { console.error("load error:", error); return {}; }
   const recs = {};
   for (const row of data) {
@@ -84,8 +84,8 @@ async function loadRandomOtherQuote(userId, myTexts=[]) {
 }
 
 // CSVエクスポート（Supabaseから取得）
-async function exportCSV() {
-  const recs = await loadAllRecords();
+async function exportCSV(userId) {
+  const recs = await loadAllRecords(userId);
   const dates = Object.keys(recs).sort();
   if (dates.length === 0) { alert("エクスポートできる記録がありません。"); return; }
 
@@ -899,7 +899,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
   );
 }
 
-function SettingsScreen({onMenu,onLogout,onTitle}){
+function SettingsScreen({onMenu,onLogout,onTitle,userId}){
   const [amTime,setAmTime]=useState("07:00");
   const [pmTime,setPmTime]=useState("22:00");
   const [amOn,setAmOn]=useState(true);
@@ -912,7 +912,7 @@ function SettingsScreen({onMenu,onLogout,onTitle}){
 
   const handleExport=async()=>{
     setExportMsg("書き出し中...");
-    try{ await exportCSV(); setExportMsg("エクスポートしました ✓"); }
+    try{ await exportCSV(userId); setExportMsg("エクスポートしました ✓"); }
     catch(e){ setExportMsg("エクスポートに失敗しました"); }
     setTimeout(()=>setExportMsg(""),3000);
   };
@@ -987,7 +987,7 @@ export default function App(){
   },[]);
 
   const fetchData=async(userId)=>{
-    const [recs, dbQuotes] = await Promise.all([loadAllRecords(), loadQuotes(userId)]);
+    const [recs, dbQuotes] = await Promise.all([loadAllRecords(userId), loadQuotes(userId)]);
     setAllRecords(recs);
     setTodayRecord(recs[todayStr]||{am:null,pm:null});
     if(dbQuotes !== null) {
@@ -1077,7 +1077,7 @@ export default function App(){
       {screen==="sub"&&subScreen==="calendar"&&<CalendarScreen onMenu={showMenu} allRecords={allRecords} onTitle={goHome}/>}
       {screen==="sub"&&subScreen==="insight"&&<InsightScreen onMenu={showMenu} allRecords={allRecords} onTitle={goHome}/>}
       {screen==="sub"&&subScreen==="quotes"&&<CollectedWordsScreen onMenu={showMenu} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>}
-      {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu} onLogout={handleLogout} onTitle={goHome}/>}
+      {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu} onLogout={handleLogout} onTitle={goHome} userId={session?.user?.id}/>}
     </Phone>
     </>
   );
