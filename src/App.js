@@ -335,7 +335,11 @@ function MainScreen({onRecord,onMenu,todayRecord}){
   const pmDone=todayRecord?.pm!=null;
   const canRecord=isAM?!amDone:!pmDone;
   return(
-    <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 32px 56px"}}>
+    <div style={{flex:1,display:"flex",flexDirection:"column"}}>
+      <div style={{display:"flex",alignItems:"center",padding:"16px 20px 12px"}}>
+        <Hamburger onOpen={onMenu}/>
+      </div>
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"0 32px 56px"}}>
       <span style={{fontSize:18,fontWeight:500,letterSpacing:"0.12em",color:T.text,fontFamily:"Georgia,serif",marginBottom:48}}>iPPO</span>
       <div style={{fontSize:12,color:T.textMuted,marginBottom:20,letterSpacing:"0.06em"}}>{dateStr}</div>
       {canRecord?(
@@ -358,6 +362,7 @@ function MainScreen({onRecord,onMenu,todayRecord}){
           </div>
         ))}
       </div>
+    </div>
     </div>
   );
 }
