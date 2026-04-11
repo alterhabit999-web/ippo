@@ -525,7 +525,7 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
             </div>
           ))}
         </div>
-        <button onClick={()=>setIdx(i=>(i+1)%displayQuotes.length)}
+        <button onClick={()=>setIdx(i=>{if(displayQuotes.length<=1)return i;let n;do{n=Math.floor(Math.random()*displayQuotes.length);}while(n===i);return n;})}
           style={{padding:"6px 20px",borderRadius:99,background:"transparent",border:`0.5px solid ${T.border}`,fontSize:11,color:T.textMuted,cursor:"pointer"}}>別の言葉を見る</button>
         <button onClick={()=>setShowAdd(true)}
           style={{padding:"9px 24px",borderRadius:99,background:T.accent,border:"none",fontSize:12,fontWeight:500,color:"#fff",cursor:"pointer",letterSpacing:"0.04em"}}>言葉をあつめる</button>
