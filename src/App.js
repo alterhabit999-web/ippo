@@ -461,7 +461,7 @@ function RecordScreen({onDone,onBack,userId}){
 
 function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
   const displayQuotes=quotes&&quotes.length>0?quotes:(isAM?QUOTES_AM:QUOTES_PM);
-  const [idx,setIdx]=useState(0);
+  const [idx,setIdx]=useState(()=>Math.floor(Math.random()*displayQuotes.length));
   const q=displayQuotes[idx%displayQuotes.length];
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
