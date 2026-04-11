@@ -21,6 +21,16 @@ if ("serviceWorker" in navigator) {
       .then((reg) => {
         console.log("SW registered:", reg.scope);
 
+        // 起動時に強制で更新チェック（PWAモードでは自動チェックされないため）
+        reg.update();
+
+        // アプリに戻ってきたときも更新チェック（ホーム画面から開き直したとき）
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") {
+            reg.update();
+          }
+        });
+
         // 新しいバージョンが見つかったとき
         reg.addEventListener("updatefound", () => {
           const newWorker = reg.installing;
