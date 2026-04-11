@@ -188,13 +188,7 @@ function LoginScreen() {
 }
 
 // ── UI部品 ────────────────────────────────────────────
-function Phone({children}){
-  useEffect(()=>{
-    document.body.style.background=T.bgPage;
-    document.documentElement.style.background=T.bgPage;
-    const meta=document.querySelector('meta[name="theme-color"]');
-    if(meta) meta.setAttribute('content', T.bgPage);
-  },[]);
+function WaveBackground(){
   // 横波グラデーション（画面幅の3倍・波の山が中央にあり左右に流れる）
   const hWave = isAM
     ? "linear-gradient(90deg,#FFF4E8 0%,#FFF4E8 15%,#FFE8CC 35%,#F0C090 50%,#FFE8CC 65%,#FFF4E8 85%,#FFF4E8 100%)"
@@ -204,21 +198,30 @@ function Phone({children}){
     ? "linear-gradient(180deg,#FFF4E8 0%,#FDEEE0 30%,#FFF4E8 60%,#FFF0E2 100%)"
     : "linear-gradient(180deg,#1A2028 0%,#1D2936 30%,#1A2028 60%,#1E2A38 100%)";
   return(
-    <div style={{width:"100%",minHeight:"100dvh",background:T.bgPage,overflow:"hidden",position:"relative",fontFamily:"sans-serif"}}>
+    <div aria-hidden="true" style={{position:"fixed",top:"-100px",right:"-100px",bottom:"-100px",left:"-100px",zIndex:0,overflow:"hidden",pointerEvents:"none",background:T.bgPage}}>
       {/* 横波レイヤー（メインの波・左右に行き来） */}
-      <div aria-hidden="true" style={{
+      <div style={{
         position:"absolute",top:0,left:"-100%",width:"300%",height:"100%",
-        background:hWave,pointerEvents:"none",
+        background:hWave,
         animation:"ippoWaveH 14s ease-in-out infinite alternate"}}/>
       {/* 縦波レイヤー（奥行き・上下に行き来） */}
-      <div aria-hidden="true" style={{
+      <div style={{
         position:"absolute",top:"-100%",left:0,width:"100%",height:"300%",
-        background:vWave,opacity:0.55,pointerEvents:"none",
+        background:vWave,opacity:0.55,
         animation:"ippoWaveV 22s ease-in-out infinite alternate-reverse"}}/>
-      {/* コンテンツ */}
-      <div style={{position:"relative",zIndex:1,display:"flex",flexDirection:"column",minHeight:"100dvh"}}>
-        {children}
-      </div>
+    </div>
+  );
+}
+function Phone({children}){
+  useEffect(()=>{
+    document.body.style.background=T.bgPage;
+    document.documentElement.style.background=T.bgPage;
+    const meta=document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', T.bgPage);
+  },[]);
+  return(
+    <div style={{width:"100%",minHeight:"100dvh",position:"relative",zIndex:1,fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
+      {children}
     </div>
   );
 }
@@ -233,7 +236,7 @@ function Hamburger({onOpen}){
 }
 function TopBar({onMenu,onBack,onTitle}){
   return(
-    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 10px",background:T.bgPage}}>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px 10px"}}>
       {onBack
         ?<button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:T.textMuted,padding:0,lineHeight:1}}>←</button>
         :<Hamburger onOpen={onMenu}/>}
@@ -346,7 +349,7 @@ function RecordScreen({onDone,onBack,userId}){
 
   return(
     <>
-      <div style={{background:T.bgPage,borderBottom:`0.5px solid ${T.border}`,display:"flex",alignItems:"center",padding:"16px 20px 12px",gap:8}}>
+      <div style={{borderBottom:`0.5px solid ${T.border}`,display:"flex",alignItems:"center",padding:"16px 20px 12px",gap:8}}>
         <button onClick={onBack} style={{background:"none",border:"none",cursor:"pointer",fontSize:20,color:T.textMuted,padding:0,lineHeight:1}}>←</button>
         <span style={{fontSize:12,color:T.textMuted,flex:1,textAlign:"center",letterSpacing:"0.05em"}}>{dateStr}　{isAM?"朝":"夜"}の記録</span>
         <div style={{width:24}}/>
@@ -555,7 +558,7 @@ function CalendarScreen({onMenu,allRecords,onTitle}){
   return(
     <>
       <TopBar onMenu={onMenu} onTitle={onTitle}/>
-      <div style={{padding:"4px 18px 0",flex:1,overflowY:"auto",background:T.bgPage,position:"relative"}}>
+      <div style={{padding:"4px 18px 0",flex:1,overflowY:"auto",position:"relative"}}>
         <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
           <button onClick={prev} style={{background:"none",border:"none",cursor:"pointer",fontSize:18,color:T.textMuted,padding:"4px 8px"}}>‹</button>
           <span style={{fontSize:13,fontWeight:500,color:T.text,letterSpacing:"0.06em"}}>{year}年 {month+1}月</span>
@@ -683,9 +686,9 @@ function InsightScreen({onMenu,allRecords,onTitle}){
   const sleepAvg=avg(data.map(d=>({v:d.sleep})),"v");
 
   return(
-    <>
+    <div style={{flex:1,display:"flex",flexDirection:"column",background:T.bgPage}}>
       <TopBar onMenu={onMenu} onTitle={onTitle}/>
-      <div style={{padding:"4px 14px 24px",overflowY:"auto",flex:1,background:T.bgPage}}>
+      <div style={{padding:"4px 14px 24px",overflowY:"auto",flex:1}}>
         <div style={{display:"flex",gap:4,background:T.sub,borderRadius:10,padding:4,marginBottom:14}}>
           {[["7","7日"],["30","30日"],["all","全期間"]].map(([key,label])=>(
             <button key={key} onClick={()=>{setPeriod(key);setActive(null);}}
@@ -727,7 +730,7 @@ function InsightScreen({onMenu,allRecords,onTitle}){
           </div>
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -776,7 +779,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
   };
 
   return(
-    <>
+    <div style={{flex:1,display:"flex",flexDirection:"column",background:T.bgPage}}>
       {/* 言葉追加モーダル */}
       {showAdd&&(
         <div style={{position:"absolute",inset:0,zIndex:60,background:"rgba(0,0,0,0.5)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}} onClick={()=>setShowAdd(false)}>
@@ -797,7 +800,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
         </div>
       )}
       <TopBar onMenu={onMenu} onTitle={onTitle}/>
-      <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1,background:T.bgPage}}>
+      <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1}}>
         {/* フィーチャー言葉 */}
         {featured&&(
           <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:16,padding:"22px 18px",marginBottom:18,textAlign:"center"}}>
@@ -892,7 +895,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
         </div>
         </>);})()}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -917,7 +920,7 @@ function SettingsScreen({onMenu,onLogout,onTitle}){
   return(
     <>
       <TopBar onMenu={onMenu} onTitle={onTitle}/>
-      <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1,background:T.bgPage}}>
+      <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1}}>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>通知</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
           {[[amOn,setAmOn,amTime,setAmTime,"朝のリマインダー","Morning の通知"],[pmOn,setPmOn,pmTime,setPmTime,"夜のリマインダー","Night の通知"]].map(([on,setOn,time,setTime,label,sub],i)=>(
@@ -1037,24 +1040,32 @@ export default function App(){
   const showDone=(isAM&&amDone)||(!isAM&&pmDone)||(amDone&&pmDone);
 
   if(!authReady) return(
-    <Phone>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:T.bgPage}}>
-        <span style={{fontSize:15,color:T.textMuted,fontFamily:"Georgia,serif",letterSpacing:"0.1em"}}>iPPO</span>
-      </div>
-    </Phone>
+    <>
+      <WaveBackground/>
+      <Phone>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:15,color:T.textMuted,fontFamily:"Georgia,serif",letterSpacing:"0.1em"}}>iPPO</span>
+        </div>
+      </Phone>
+    </>
   );
 
   if(!session) return <LoginScreen/>;
 
   if(screen==="loading") return(
-    <Phone>
-      <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:T.bgPage}}>
-        <span style={{fontSize:15,color:T.textMuted,fontFamily:"Georgia,serif",letterSpacing:"0.1em"}}>iPPO</span>
-      </div>
-    </Phone>
+    <>
+      <WaveBackground/>
+      <Phone>
+        <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          <span style={{fontSize:15,color:T.textMuted,fontFamily:"Georgia,serif",letterSpacing:"0.1em"}}>iPPO</span>
+        </div>
+      </Phone>
+    </>
   );
 
   return(
+    <>
+    <WaveBackground/>
     <Phone>
       {menuOpen&&<SideMenu onNav={navTo} onClose={hideMenu} onTitle={goHome}/>}
       {screen==="main"&&(showDone
@@ -1068,5 +1079,6 @@ export default function App(){
       {screen==="sub"&&subScreen==="quotes"&&<CollectedWordsScreen onMenu={showMenu} quotes={quotes} setQuotes={setQuotes} onTitle={goHome} userId={session.user.id}/>}
       {screen==="sub"&&subScreen==="settings"&&<SettingsScreen onMenu={showMenu} onLogout={handleLogout} onTitle={goHome}/>}
     </Phone>
+    </>
   );
 }
