@@ -103,6 +103,51 @@ async function exportCSV(userId) {
   URL.revokeObjectURL(url);
 }
 
+// ── 時間帯別フレーズ ──────────────────────────────────
+const TIME_PHRASES = {
+  morning: [
+    "おはよう、からはじまる一日",
+    "また一歩、踏み出す朝",
+    "今日のあなたが、ここにいる",
+    "朝が来た、一日が始まる",
+    "カーテンを開ける、おひさまを浴びる",
+  ],
+  noon: [
+    "ここらでちょっとひと休み",
+    "今日の真ん中にいる",
+    "お昼どき、ひと息ついて",
+    "午後も、ひとつずつ",
+    "今日もここまで来た",
+  ],
+  evening: [
+    "空が染まる、今日もよかった",
+    "お疲れさま、家に帰ろう",
+    "夕暮れが、今日を包む",
+    "夕暮れどき、深呼吸して",
+    "帰り道、今日もよかった",
+  ],
+  night: [
+    "今日も一日、お疲れさま",
+    "また一歩、前進した",
+    "ゆっくり休もう",
+    "明日はどんな良いことがあるかな",
+    "おやすみ、また明日",
+  ],
+};
+
+function getTimePeriod() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return "morning";
+  if (h >= 12 && h < 17) return "noon";
+  if (h >= 17 && h < 21) return "evening";
+  return "night";
+}
+
+function getRandomTimePhrase() {
+  const phrases = TIME_PHRASES[getTimePeriod()];
+  return phrases[Math.floor(Math.random() * phrases.length)];
+}
+
 // ── 定数 ──────────────────────────────────────────────
 const now = new Date();
 const isAM = now.getHours() < 17;
@@ -420,6 +465,7 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
   const q=displayQuotes[idx%displayQuotes.length];
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
+  const [timePhrase]=useState(()=>getRandomTimePhrase());
   const [showAdd,setShowAdd]=useState(false);
   const [newText,setNewText]=useState("");
   const [newSource,setNewSource]=useState("");
@@ -465,7 +511,7 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
           <div style={{width:12,height:12,borderRadius:"50%",background:T.accent}}/>
         </div>
         <div style={{textAlign:"center"}}>
-          <div style={{fontSize:10,letterSpacing:"0.12em",color:T.accent,marginBottom:16,fontWeight:500}}>{isAM?"今日の朝に":"今日の夜に"}</div>
+          <div style={{fontSize:10,letterSpacing:"0.12em",color:T.accent,marginBottom:16,fontWeight:500}}>{timePhrase}</div>
           <div style={{fontSize:15,color:T.text,lineHeight:2,fontFamily:"Georgia,serif",whiteSpace:"pre-line"}}>"{q.text}"</div>
           {q.sub&&<div style={{fontSize:12,color:T.textMuted,lineHeight:1.8,fontFamily:"Georgia,serif",marginTop:8}}>{q.sub}</div>}
           {q.source&&<div style={{fontSize:11,color:T.textMuted,marginTop:6,fontFamily:"Georgia,serif"}}>— {q.source}</div>}
