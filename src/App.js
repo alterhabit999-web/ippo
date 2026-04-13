@@ -639,7 +639,7 @@ function CalendarScreen({onMenu,allRecords,onTitle}){
             );
           })}
         </div>
-        <div style={{display:"flex",gap:14,paddingBottom:20,justifyContent:"center"}}>
+        <div style={{display:"flex",gap:14,paddingBottom:12,justifyContent:"center"}}>
           {[[morningSub,"朝の記録あり"],[nightSub,"夜の記録あり"]].map(([color,label])=>(
             <div key={label} style={{display:"flex",alignItems:"center",gap:5}}>
               <div style={{width:6,height:6,borderRadius:"50%",background:color}}/>
@@ -647,6 +647,26 @@ function CalendarScreen({onMenu,allRecords,onTitle}){
             </div>
           ))}
         </div>
+        {(()=>{
+          let streak=0;
+          const d=new Date();
+          while(true){
+            const k=toKey(d.getFullYear(),d.getMonth(),d.getDate());
+            if(allRecords[k]&&(allRecords[k].am||allRecords[k].pm)){streak++;d.setDate(d.getDate()-1);}
+            else break;
+          }
+          return streak>0?(
+            <div style={{textAlign:"center",paddingBottom:20}}>
+              <div style={{display:"inline-flex",alignItems:"center",gap:8,background:T.sub,borderRadius:12,padding:"10px 18px"}}>
+                <span style={{fontSize:20}}>🔥</span>
+                <div>
+                  <div style={{fontSize:18,fontWeight:600,color:T.accent,lineHeight:1}}>{streak}</div>
+                  <div style={{fontSize:10,color:T.textMuted,marginTop:2}}>日連続で記録中</div>
+                </div>
+              </div>
+            </div>
+          ):null;
+        })()}
         {selected&&allRecords[selected]&&<Detail dateKey={selected} rec={allRecords[selected]} onClose={()=>setSelected(null)}/>}
       </div>
     </>
@@ -951,11 +971,36 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
 }
 
 function SettingsScreen({onMenu,onLogout,onTitle,userId}){
-  const [amTime,setAmTime]=useState("07:00");
-  const [pmTime,setPmTime]=useState("22:00");
-  const [amOn,setAmOn]=useState(true);
-  const [pmOn,setPmOn]=useState(true);
+  const [amTime,setAmTime]=useState(()=>localStorage.getItem("ippo_amTime")||"07:00");
+  const [pmTime,setPmTime]=useState(()=>localStorage.getItem("ippo_pmTime")||"22:00");
+  const [amOn,setAmOn]=useState(()=>localStorage.getItem("ippo_amOn")!=="false");
+  const [pmOn,setPmOn]=useState(()=>localStorage.getItem("ippo_pmOn")!=="false");
+  const [notifPermission,setNotifPermission]=useState(()=>"Notification" in window?Notification.permission:"denied");
   const [exportMsg,setExportMsg]=useState("");
+
+  const requestNotifPermission=async()=>{
+    if(!("Notification" in window)) return "denied";
+    const perm=await Notification.requestPermission();
+    setNotifPermission(perm);
+    return perm;
+  };
+
+  const handleToggleAm=async(v)=>{
+    if(v&&notifPermission!=="granted"){
+      const perm=await requestNotifPermission();
+      if(perm!=="granted") return;
+    }
+    setAmOn(v);localStorage.setItem("ippo_amOn",v);
+  };
+  const handleTogglePm=async(v)=>{
+    if(v&&notifPermission!=="granted"){
+      const perm=await requestNotifPermission();
+      if(perm!=="granted") return;
+    }
+    setPmOn(v);localStorage.setItem("ippo_pmOn",v);
+  };
+  const handleAmTime=(e)=>{setAmTime(e.target.value);localStorage.setItem("ippo_amTime",e.target.value);};
+  const handlePmTime=(e)=>{setPmTime(e.target.value);localStorage.setItem("ippo_pmTime",e.target.value);};
 
   function Toggle({value,onChange}){
     return <div onClick={()=>onChange(!value)} style={{width:38,height:21,borderRadius:11,cursor:"pointer",background:value?T.accent:T.border,position:"relative",transition:"background 0.2s"}}><div style={{position:"absolute",top:3,left:value?19:3,width:15,height:15,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}}/></div>;
@@ -974,15 +1019,20 @@ function SettingsScreen({onMenu,onLogout,onTitle,userId}){
       <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1}}>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>通知</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
-          {[[amOn,setAmOn,amTime,setAmTime,"朝のリマインダー","Morning の通知"],[pmOn,setPmOn,pmTime,setPmTime,"夜のリマインダー","Night の通知"]].map(([on,setOn,time,setTime,label,sub],i)=>(
+          {[[amOn,handleToggleAm,amTime,handleAmTime,"朝のリマインダー","Morning の通知"],[pmOn,handleTogglePm,pmTime,handlePmTime,"夜のリマインダー","Night の通知"]].map(([on,onToggle,time,onTime,label,sub],i)=>(
             <div key={label} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderBottom:i===0?`0.5px solid ${T.border}`:"none"}}>
               <div><div style={{fontSize:13,color:T.text}}>{label}</div><div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{sub}</div></div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                {on&&<input type="time" value={time} onChange={e=>setTime(e.target.value)} style={{fontSize:12,color:T.text,background:"transparent",border:"none",outline:"none"}}/>}
-                <Toggle value={on} onChange={setOn}/>
+                {on&&<input type="time" value={time} onChange={onTime} style={{fontSize:12,color:T.text,background:"transparent",border:"none",outline:"none"}}/>}
+                <Toggle value={on} onChange={onToggle}/>
               </div>
             </div>
           ))}
+          {notifPermission==="denied"&&(amOn||pmOn)&&(
+            <div style={{padding:"8px 14px",fontSize:11,color:"#C07888"}}>
+              通知がブロックされています。ブラウザの設定から通知を許可してください。
+            </div>
+          )}
         </div>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>データ</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
@@ -1085,6 +1135,32 @@ export default function App(){
     setScreen("main");setSubScreen(null);setMenuOpen(false);
     if(session) await fetchData(session.user.id);
   };
+
+  // ── リマインド通知チェック ──
+  useEffect(()=>{
+    if(!("Notification" in window)||Notification.permission!=="granted") return;
+    const sentKey=()=>`ippo_notifSent_${todayStr}`;
+    const check=()=>{
+      const now2=new Date();
+      const hhmm=String(now2.getHours()).padStart(2,"0")+":"+String(now2.getMinutes()).padStart(2,"0");
+      const sent=JSON.parse(localStorage.getItem(sentKey())||"{}");
+      const amOn2=localStorage.getItem("ippo_amOn")!=="false";
+      const pmOn2=localStorage.getItem("ippo_pmOn")!=="false";
+      const amTime2=localStorage.getItem("ippo_amTime")||"07:00";
+      const pmTime2=localStorage.getItem("ippo_pmTime")||"22:00";
+      if(amOn2&&hhmm===amTime2&&!sent.am){
+        new Notification("iPPO - 朝の記録",{body:"おはよう！朝の記録をつけましょう",icon:"/ippo/logo192.png",tag:"ippo-am"});
+        sent.am=true;localStorage.setItem(sentKey(),JSON.stringify(sent));
+      }
+      if(pmOn2&&hhmm===pmTime2&&!sent.pm){
+        new Notification("iPPO - 夜の記録",{body:"お疲れさま！今日の振り返りをしましょう",icon:"/ippo/logo192.png",tag:"ippo-pm"});
+        sent.pm=true;localStorage.setItem(sentKey(),JSON.stringify(sent));
+      }
+    };
+    check();
+    const id=setInterval(check,30000);
+    return ()=>clearInterval(id);
+  },[]);
 
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
