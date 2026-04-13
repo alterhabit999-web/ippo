@@ -63,6 +63,19 @@ self.addEventListener("fetch", (e) => {
   );
 });
 
+// 通知クリックでアプリを開く
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((cls) => {
+      for (const c of cls) {
+        if (c.url.includes("/ippo") && "focus" in c) return c.focus();
+      }
+      return clients.openWindow("./");
+    })
+  );
+});
+
 // アプリからの「今すぐ更新して」メッセージを受け取る
 self.addEventListener("message", (e) => {
   if (e.data === "SKIP_WAITING") {
