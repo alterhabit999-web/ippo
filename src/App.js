@@ -675,6 +675,23 @@ function CalendarScreen({onMenu,allRecords,onTitle}){
             </div>
           ))}
         </div>
+        {(()=>{
+          let streak=0;
+          const d=new Date();
+          while(true){
+            const k=toKey(d.getFullYear(),d.getMonth(),d.getDate());
+            if(allRecords[k]&&(allRecords[k].am||allRecords[k].pm)){streak++;d.setDate(d.getDate()-1);}
+            else break;
+          }
+          return streak>0?(
+            <div style={{textAlign:"center",paddingBottom:20}}>
+              <div style={{display:"inline-flex",alignItems:"baseline",gap:4,background:T.sub,borderRadius:14,padding:"10px 20px"}}>
+                <span style={{fontSize:22,fontWeight:600,color:T.accent}}>{streak}</span>
+                <span style={{fontSize:12,color:T.textMuted}}>日連続記録中</span>
+              </div>
+            </div>
+          ):null;
+        })()}
         {selected&&allRecords[selected]&&<Detail dateKey={selected} rec={allRecords[selected]} onClose={()=>setSelected(null)}/>}
       </div>
     </>
@@ -979,11 +996,37 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
 }
 
 function SettingsScreen({onMenu,onLogout,onTitle,userId}){
-  const [amTime,setAmTime]=useState("07:00");
-  const [pmTime,setPmTime]=useState("22:00");
-  const [amOn,setAmOn]=useState(true);
-  const [pmOn,setPmOn]=useState(true);
+  const [amTime,setAmTime]=useState(()=>localStorage.getItem("ippo_amTime")||"07:00");
+  const [pmTime,setPmTime]=useState(()=>localStorage.getItem("ippo_pmTime")||"22:00");
+  const [amOn,setAmOn]=useState(()=>localStorage.getItem("ippo_amOn")!=="false");
+  const [pmOn,setPmOn]=useState(()=>localStorage.getItem("ippo_pmOn")!=="false");
+  const [notifPermission,setNotifPermission]=useState(()=>"Notification" in window?Notification.permission:"denied");
   const [exportMsg,setExportMsg]=useState("");
+
+  const notifySettingsChanged=()=>window.dispatchEvent(new Event("ippo:settings-changed"));
+
+  const handleToggleAm=async(v)=>{
+    // 必ずトグル状態を更新（許可状態に依存しない）
+    setAmOn(v);localStorage.setItem("ippo_amOn",v);
+    // ONにした時、許可がまだなら要求（ブロックはしない）
+    if(v&&"Notification" in window&&Notification.permission==="default"){
+      try{ const perm=await Notification.requestPermission(); setNotifPermission(perm); }catch(e){}
+    }else if("Notification" in window){
+      setNotifPermission(Notification.permission);
+    }
+    notifySettingsChanged();
+  };
+  const handleTogglePm=async(v)=>{
+    setPmOn(v);localStorage.setItem("ippo_pmOn",v);
+    if(v&&"Notification" in window&&Notification.permission==="default"){
+      try{ const perm=await Notification.requestPermission(); setNotifPermission(perm); }catch(e){}
+    }else if("Notification" in window){
+      setNotifPermission(Notification.permission);
+    }
+    notifySettingsChanged();
+  };
+  const handleAmTime=(e)=>{setAmTime(e.target.value);localStorage.setItem("ippo_amTime",e.target.value);notifySettingsChanged();};
+  const handlePmTime=(e)=>{setPmTime(e.target.value);localStorage.setItem("ippo_pmTime",e.target.value);notifySettingsChanged();};
 
   function Toggle({value,onChange}){
     return <div onClick={()=>onChange(!value)} style={{width:38,height:21,borderRadius:11,cursor:"pointer",background:value?T.accent:T.border,position:"relative",transition:"background 0.2s"}}><div style={{position:"absolute",top:3,left:value?19:3,width:15,height:15,borderRadius:"50%",background:"#fff",transition:"left 0.2s"}}/></div>;
@@ -1002,15 +1045,25 @@ function SettingsScreen({onMenu,onLogout,onTitle,userId}){
       <div style={{padding:"4px 14px 28px",overflowY:"auto",flex:1}}>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>通知</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
-          {[[amOn,setAmOn,amTime,setAmTime,"朝のリマインダー","Morning の通知"],[pmOn,setPmOn,pmTime,setPmTime,"夜のリマインダー","Night の通知"]].map(([on,setOn,time,setTime,label,sub],i)=>(
+          {[[amOn,handleToggleAm,amTime,handleAmTime,"朝のリマインダー","Morning の通知"],[pmOn,handleTogglePm,pmTime,handlePmTime,"夜のリマインダー","Night の通知"]].map(([on,onToggle,time,onTime,label,sub],i)=>(
             <div key={label} style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"12px 14px",borderBottom:i===0?`0.5px solid ${T.border}`:"none"}}>
               <div><div style={{fontSize:13,color:T.text}}>{label}</div><div style={{fontSize:11,color:T.textMuted,marginTop:2}}>{sub}</div></div>
               <div style={{display:"flex",alignItems:"center",gap:8}}>
-                {on&&<input type="time" value={time} onChange={e=>setTime(e.target.value)} style={{fontSize:12,color:T.text,background:"transparent",border:"none",outline:"none"}}/>}
-                <Toggle value={on} onChange={setOn}/>
+                {on&&<input type="time" value={time} onChange={onTime} style={{fontSize:12,color:T.text,background:"transparent",border:"none",outline:"none"}}/>}
+                <Toggle value={on} onChange={onToggle}/>
               </div>
             </div>
           ))}
+          {(amOn||pmOn)&&notifPermission==="denied"&&(
+            <div style={{padding:"8px 14px",fontSize:11,color:"#C07888",borderTop:`0.5px solid ${T.border}`}}>
+              通知がブロックされています。ブラウザ・端末の設定から通知を許可してください。
+            </div>
+          )}
+          {(amOn||pmOn)&&notifPermission==="default"&&(
+            <div style={{padding:"8px 14px",fontSize:11,color:T.textMuted,borderTop:`0.5px solid ${T.border}`}}>
+              通知の許可が必要です。トグルを一度オフにしてから再度オンにしてください。
+            </div>
+          )}
         </div>
         <div style={{fontSize:10,fontWeight:500,letterSpacing:"0.1em",color:T.accent,marginBottom:8}}>データ</div>
         <div style={{background:T.bg,border:`0.5px solid ${T.border}`,borderRadius:14,overflow:"hidden",marginBottom:18}}>
@@ -1139,6 +1192,159 @@ export default function App(){
     setScreen("main");setSubScreen(null);setMenuOpen(false);
     if(session) await fetchData(session.user.id);
   };
+
+  // ── リマインド通知チェック ──
+  useEffect(()=>{
+    const showNotif=async(title,body,tag)=>{
+      const opts={body,icon:"/ippo/logo192.png",badge:"/ippo/logo192.png",tag,requireInteraction:false};
+      if("serviceWorker" in navigator){
+        try{
+          const reg=await navigator.serviceWorker.ready;
+          await reg.showNotification(title,opts);
+          return;
+        }catch(e){console.warn("SW notification failed:",e);}
+      }
+      try{ new Notification(title,opts); }catch(e){console.warn("Notification failed:",e);}
+    };
+    const todayKey=()=>{
+      const d=new Date();
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    };
+    const check=async()=>{
+      if(!("Notification" in window)||Notification.permission!=="granted") return;
+      const now2=new Date();
+      const sentKey=`ippo_notifSent_${todayKey()}`;
+      const sent=JSON.parse(localStorage.getItem(sentKey)||"{}");
+      const amOn2=localStorage.getItem("ippo_amOn")!=="false";
+      const pmOn2=localStorage.getItem("ippo_pmOn")!=="false";
+      const amTime2=localStorage.getItem("ippo_amTime")||"07:00";
+      const pmTime2=localStorage.getItem("ippo_pmTime")||"22:00";
+      // 厳密一致 + 直近5分以内のキャッチアップ（アプリを閉じていた場合用）
+      const isWithin5=(target)=>{
+        const [th,tm]=target.split(":").map(Number);
+        const tMin=th*60+tm;
+        const cMin=now2.getHours()*60+now2.getMinutes();
+        return cMin>=tMin&&cMin<=tMin+5;
+      };
+      if(amOn2&&!sent.am&&isWithin5(amTime2)){
+        await showNotif("iPPO - 朝の記録","おはよう！朝の記録をつけましょう","ippo-am");
+        sent.am=true;localStorage.setItem(sentKey,JSON.stringify(sent));
+      }
+      if(pmOn2&&!sent.pm&&isWithin5(pmTime2)){
+        await showNotif("iPPO - 夜の記録","お疲れさま！今日の振り返りをしましょう","ippo-pm");
+        sent.pm=true;localStorage.setItem(sentKey,JSON.stringify(sent));
+      }
+    };
+    // バックグラウンド通知のスケジュール（TimestampTrigger対応ブラウザのみ）
+    const scheduleBackground=async()=>{
+      if(!("Notification" in window)||Notification.permission!=="granted") return;
+      if(!("serviceWorker" in navigator)) return;
+      if(typeof window.TimestampTrigger==="undefined") return;
+      try{
+        const reg=await navigator.serviceWorker.ready;
+        const existing=await reg.getNotifications({includeTriggered:true});
+        for(const n of existing){ if(n.tag&&n.tag.startsWith("ippo-bg-")) n.close(); }
+        const amOn2=localStorage.getItem("ippo_amOn")!=="false";
+        const pmOn2=localStorage.getItem("ippo_pmOn")!=="false";
+        const amTime2=localStorage.getItem("ippo_amTime")||"07:00";
+        const pmTime2=localStorage.getItem("ippo_pmTime")||"22:00";
+        const now2=new Date();
+        const scheduleFor=async(title,body,time,prefix)=>{
+          const [h,m]=time.split(":").map(Number);
+          for(let i=0;i<7;i++){
+            const d=new Date(now2);
+            d.setDate(d.getDate()+i);
+            d.setHours(h,m,0,0);
+            if(d.getTime()>now2.getTime()){
+              await reg.showNotification(title,{body,icon:"/ippo/logo192.png",badge:"/ippo/logo192.png",tag:`ippo-bg-${prefix}-${i}`,showTrigger:new window.TimestampTrigger(d.getTime())});
+            }
+          }
+        };
+        if(amOn2) await scheduleFor("iPPO - 朝の記録","おはよう！朝の記録をつけましょう",amTime2,"am");
+        if(pmOn2) await scheduleFor("iPPO - 夜の記録","お疲れさま！今日の振り返りをしましょう",pmTime2,"pm");
+      }catch(e){console.warn("Background schedule failed:",e);}
+    };
+    check();
+    scheduleBackground();
+    const id=setInterval(check,30000);
+    const onVis=()=>{ if(!document.hidden){ check(); scheduleBackground(); } };
+    document.addEventListener("visibilitychange",onVis);
+    const onSettings=()=>{ check(); scheduleBackground(); };
+    window.addEventListener("ippo:settings-changed",onSettings);
+    return ()=>{
+      clearInterval(id);
+      document.removeEventListener("visibilitychange",onVis);
+      window.removeEventListener("ippo:settings-changed",onSettings);
+    };
+  },[]);
+
+  // ── Web Push 購読登録（iOS PWA バックグラウンド通知用） ──
+  useEffect(()=>{
+    if(!session) return;
+    const userId=session.user.id;
+
+    // VAPID公開鍵を Uint8Array に変換
+    const urlBase64ToUint8Array=(base64String)=>{
+      const padding="=".repeat((4-base64String.length%4)%4);
+      const base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+      const rawData=window.atob(base64);
+      const out=new Uint8Array(rawData.length);
+      for(let i=0;i<rawData.length;i++) out[i]=rawData.charCodeAt(i);
+      return out;
+    };
+
+    const syncSettings=async()=>{
+      try{
+        const amOn=localStorage.getItem("ippo_amOn")!=="false";
+        const pmOn=localStorage.getItem("ippo_pmOn")!=="false";
+        const amTime=localStorage.getItem("ippo_amTime")||"07:00";
+        const pmTime=localStorage.getItem("ippo_pmTime")||"22:00";
+        const tzOffset=-new Date().getTimezoneOffset(); // 分単位（JST=+540）
+        await supabase.from("user_notification_settings").upsert({
+          user_id:userId,
+          am_time:amTime,
+          pm_time:pmTime,
+          am_on:amOn,
+          pm_on:pmOn,
+          timezone_offset:tzOffset,
+          updated_at:new Date().toISOString(),
+        });
+      }catch(e){console.warn("sync settings failed:",e);}
+    };
+
+    const subscribePush=async()=>{
+      try{
+        if(!("serviceWorker" in navigator)) return;
+        if(!("PushManager" in window)) return;
+        if(!("Notification" in window)||Notification.permission!=="granted") return;
+        const vapidKey=process.env.REACT_APP_VAPID_PUBLIC_KEY;
+        if(!vapidKey) { console.warn("VAPID public key missing"); return; }
+        const reg=await navigator.serviceWorker.ready;
+        let sub=await reg.pushManager.getSubscription();
+        if(!sub){
+          sub=await reg.pushManager.subscribe({
+            userVisibleOnly:true,
+            applicationServerKey:urlBase64ToUint8Array(vapidKey),
+          });
+        }
+        const json=sub.toJSON();
+        if(!json||!json.endpoint||!json.keys) return;
+        await supabase.from("push_subscriptions").upsert({
+          endpoint:json.endpoint,
+          user_id:userId,
+          p256dh:json.keys.p256dh,
+          auth_key:json.keys.auth,
+        },{onConflict:"endpoint"});
+      }catch(e){console.warn("push subscribe failed:",e);}
+    };
+
+    // 初回実行 + 設定変更時に同期
+    syncSettings();
+    subscribePush();
+    const onSettings=()=>{ syncSettings(); subscribePush(); };
+    window.addEventListener("ippo:settings-changed",onSettings);
+    return ()=>window.removeEventListener("ippo:settings-changed",onSettings);
+  },[session]);
 
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
