@@ -38,12 +38,22 @@ async function loadAllRecords(userId) {
   return recs;
 }
 
-// 記録をSupabaseにupsert
+// 記録をSupabaseにupsert（リトライ付き）
 async function saveRecord(data, userId) {
   const row = { ...recordToRow(data), user_id: userId };
-  const { error } = await supabase.from("records").upsert(row, { onConflict: "user_id,date,type" });
-  if (error) { console.error("save error:", error); return error; }
-  return null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const { error } = await supabase.from("records").upsert(row, { onConflict: "user_id,date,type" });
+      if (!error) return null; // 成功
+      console.error(`save error (attempt ${attempt + 1}):`, error);
+      if (attempt === 0) await new Promise(r => setTimeout(r, 500)); // 1回目失敗時は500ms待ってリトライ
+      else return error; // 2回目も失敗したらエラーを返す
+    } catch (e) {
+      console.error(`save exception (attempt ${attempt + 1}):`, e);
+      if (attempt === 0) await new Promise(r => setTimeout(r, 500));
+      else return { message: e.message || "保存中にエラーが発生しました" };
+    }
+  }
 }
 
 // あつめた言葉をSupabaseから取得（自分のみ）
@@ -60,22 +70,22 @@ async function insertQuote(text, source, userId) {
   return data;
 }
 
-// 言葉をSupabaseで更新
-async function updateQuoteDB(id, text, source) {
-  const { error } = await supabase.from("quotes").update({ text, source: source || "" }).eq("id", id);
+// 言葉をSupabaseで更新（userId照合で他人のデータ更新を防止）
+async function updateQuoteDB(id, text, source, userId) {
+  const { error } = await supabase.from("quotes").update({ text, source: source || "" }).eq("id", id).eq("user_id", userId);
   if (error) console.error("quote update error:", error);
 }
 
-// 言葉をSupabaseから削除
-async function deleteQuoteDB(id) {
-  const { error } = await supabase.from("quotes").delete().eq("id", id);
+// 言葉をSupabaseから削除（userId照合で他人のデータ削除を防止）
+async function deleteQuoteDB(id, userId) {
+  const { error } = await supabase.from("quotes").delete().eq("id", id).eq("user_id", userId);
   if (error) console.error("quote delete error:", error);
 }
 
 // 他ユーザーの言葉をランダムに1件取得（自分の保有テキストと重複除外）
 async function loadRandomOtherQuote(userId, myTexts=[]) {
   const { data, error } = await supabase
-    .from("quotes").select("id, text, source, user_id")
+    .from("quotes").select("id, text, source")
     .neq("user_id", userId).neq("source", "iPPO").limit(50);
   if (error || !data || data.length === 0) return null;
   const filtered = data.filter(q => !myTexts.includes(q.text));
@@ -99,8 +109,8 @@ async function exportCSV(userId) {
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = `ippo_records_${todayStr}.csv`; a.click();
-  URL.revokeObjectURL(url);
+  a.href = url; a.download = `ippo_records_${getTodayStr()}.csv`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 5000); // ダウンロード完了を待ってからURL解放
 }
 
 // ── 時間帯別フレーズ ──────────────────────────────────
@@ -148,15 +158,31 @@ function getRandomTimePhrase() {
   return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
-// ── 定数 ──────────────────────────────────────────────
-const now = new Date();
-const isAM = now.getHours() < 17;
-const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}-${String(now.getDate()).padStart(2,"0")}`;
-const dateStr = `${now.getMonth()+1}月${now.getDate()}日`;
-
+// ── 定数・時刻ユーティリティ ──────────────────────────
 const AM = { bgPage:"#FFF4E8", bg:"#FFF8F0", sub:"#FFE8CC", accent:"#D45F10", accentLight:"#F0A060", border:"#EEC898", text:"#3A2A18", textMuted:"#A07850" };
 const PM = { bgPage:"#1A2028", bg:"#232830", sub:"#2E3840", accent:"#5A8AAA", accentLight:"#A8C8D8", border:"#343C48", text:"#D8E8EE", textMuted:"#6A7888" };
-const T = isAM ? AM : PM;
+
+// 時刻に依存する値を動的に計算（アプリ起動後も常に最新の値を返す）
+function getIsAM() { return new Date().getHours() < 17; }
+function getTodayStr() { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; }
+function getDateStr() { const n=new Date(); return `${n.getMonth()+1}月${n.getDate()}日`; }
+
+// モジュールレベル変数（refreshTimeState()で最新に更新される）
+let isAM = getIsAM();
+let todayStr = getTodayStr();
+let dateStr = getDateStr();
+let T = isAM ? AM : PM;
+
+// 時刻状態を一括更新する関数（戻り値: 変化があったかどうか）
+function refreshTimeState() {
+  const prevIsAM = isAM;
+  const prevToday = todayStr;
+  isAM = getIsAM();
+  todayStr = getTodayStr();
+  dateStr = getDateStr();
+  T = isAM ? AM : PM;
+  return prevIsAM !== isAM || prevToday !== todayStr;
+}
 
 const moodColor="#F0A060", energyColor="#5A8AAA", stressColor="#C07888", sleepColor="#8AAA6A";
 const morningColor="#D45F10", morningSub="#F0A060", nightColor="#5A8AAA", nightSub="#A8C8D8";
@@ -258,12 +284,13 @@ function WaveBackground(){
   );
 }
 function Phone({children}){
+  // T.bgPageは時刻変化で更新されるため、毎レンダーで反映する
   useEffect(()=>{
     document.body.style.background=T.bgPage;
     document.documentElement.style.background=T.bgPage;
     const meta=document.querySelector('meta[name="theme-color"]');
     if(meta) meta.setAttribute('content', T.bgPage);
-  },[]);
+  });
   return(
     <div style={{width:"100%",minHeight:"100dvh",position:"relative",zIndex:1,fontFamily:"sans-serif",display:"flex",flexDirection:"column"}}>
       {children}
@@ -540,10 +567,11 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
 }
 
 function CalendarScreen({onMenu,allRecords,onTitle}){
-  const [year,setYear]=useState(now.getFullYear());
-  const [month,setMonth]=useState(now.getMonth());
+  const calNow=new Date();
+  const [year,setYear]=useState(calNow.getFullYear());
+  const [month,setMonth]=useState(calNow.getMonth());
   const [selected,setSelected]=useState(null);
-  const todayKey=toKey(now.getFullYear(),now.getMonth(),now.getDate());
+  const todayKey=toKey(calNow.getFullYear(),calNow.getMonth(),calNow.getDate());
   const daysInMonth=getDaysInMonth(year,month);
   const firstDay=getFirstDay(year,month);
   const cells=[];
@@ -639,7 +667,7 @@ function CalendarScreen({onMenu,allRecords,onTitle}){
             );
           })}
         </div>
-        <div style={{display:"flex",gap:14,paddingBottom:12,justifyContent:"center"}}>
+        <div style={{display:"flex",gap:14,paddingBottom:20,justifyContent:"center"}}>
           {[[morningSub,"朝の記録あり"],[nightSub,"夜の記録あり"]].map(([color,label])=>(
             <div key={label} style={{display:"flex",alignItems:"center",gap:5}}>
               <div style={{width:6,height:6,borderRadius:"50%",background:color}}/>
@@ -875,7 +903,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
             <div style={{fontSize:10,letterSpacing:"0.12em",color:T.accent,marginBottom:12,fontWeight:500}}>今日の言葉</div>
             <div style={{fontSize:15,color:T.text,lineHeight:2,fontFamily:"Georgia,serif",whiteSpace:"pre-line"}}>"{featured.text}"</div>
             {featured.source&&<div style={{fontSize:11,color:T.textMuted,marginTop:8,fontFamily:"Georgia,serif"}}>— {featured.source}</div>}
-            <button onClick={()=>setFeaturedIdx(i=>(i+1)%quotes.length)}
+            <button onClick={()=>{if(quotes.length>1) setFeaturedIdx(i=>(i+1)%quotes.length);}}
               style={{marginTop:14,padding:"5px 18px",borderRadius:99,background:"transparent",border:`0.5px solid ${T.border}`,fontSize:11,color:T.textMuted,cursor:"pointer"}}>別の言葉を見る</button>
           </div>
         )}
@@ -933,12 +961,12 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
                     style={{fontSize:11,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:8,padding:"6px 10px",outline:"none",width:"100%",boxSizing:"border-box"}}/>
                   <div style={{display:"flex",gap:7}}>
                     <button onClick={async()=>{
-                      await updateQuoteDB(q.id, editText, editSource);
+                      await updateQuoteDB(q.id, editText, editSource, userId);
                       setQuotes(p=>p.map(x=>x.id===q.id?{...x,text:editText,source:editSource}:x));
                       setEditId(null);
                     }} style={{flex:1,padding:"6px 0",borderRadius:8,fontSize:11,background:T.accent,border:"none",color:"#fff",cursor:"pointer"}}>保存</button>
                     <button onClick={async()=>{
-                      await deleteQuoteDB(q.id);
+                      await deleteQuoteDB(q.id, userId);
                       setQuotes(p=>p.filter(x=>x.id!==q.id));
                       setEditId(null);
                     }} style={{padding:"6px 12px",borderRadius:8,fontSize:11,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,cursor:"pointer"}}>削除</button>
@@ -1078,12 +1106,24 @@ export default function App(){
   const [session,setSession]=useState(null);
   const [authReady,setAuthReady]=useState(false);
   const [quotes,setQuotes]=useState([]);
+  const [,setTimeKey]=useState(0); // 時刻変化時にアプリ全体を再描画するためのキー
+
+  // 時刻状態を自動更新（アプリに戻ってきた時＋1分ごとにチェック）
+  useEffect(()=>{
+    const check=()=>{
+      if(refreshTimeState()) setTimeKey(k=>k+1);
+    };
+    const onVisible=()=>{ if(document.visibilityState==="visible") check(); };
+    document.addEventListener("visibilitychange",onVisible);
+    const timer=setInterval(check,60000); // 1分ごとに日付・時間帯の変化をチェック
+    return ()=>{ document.removeEventListener("visibilitychange",onVisible); clearInterval(timer); };
+  },[]);
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data:{session}})=>{
       setSession(session);
       setAuthReady(true);
-    });
+    }).catch(()=>setAuthReady(true)); // ネットワークエラー時もローディング画面から抜ける
     const {data:{subscription}}=supabase.auth.onAuthStateChange((_,session)=>{
       setSession(session);
     });
@@ -1091,18 +1131,22 @@ export default function App(){
   },[]);
 
   const fetchData=async(userId)=>{
-    const [recs, dbQuotes] = await Promise.all([loadAllRecords(userId), loadQuotes(userId)]);
-    setAllRecords(recs);
-    setTodayRecord(recs[todayStr]||{am:null,pm:null});
-    if(dbQuotes !== null) {
-      const hasDefaults = dbQuotes.some(q => q.source === "iPPO");
-      if(!hasDefaults) {
-        const seeded = await Promise.all(DEFAULT_QUOTES_DATA.map(q => insertQuote(q.text, q.source, userId)));
-        const validSeeded = seeded.filter(Boolean).map(row => ({id:row.id, text:row.text, source:row.source||""}));
-        setQuotes([...validSeeded, ...dbQuotes]);
-      } else {
-        setQuotes(dbQuotes);
+    try{
+      const [recs, dbQuotes] = await Promise.all([loadAllRecords(userId), loadQuotes(userId)]);
+      setAllRecords(recs);
+      setTodayRecord(recs[todayStr]||{am:null,pm:null});
+      if(dbQuotes !== null) {
+        const hasDefaults = dbQuotes.some(q => q.source === "iPPO");
+        if(!hasDefaults) {
+          const seeded = await Promise.all(DEFAULT_QUOTES_DATA.map(q => insertQuote(q.text, q.source, userId)));
+          const validSeeded = seeded.filter(Boolean).map(row => ({id:row.id, text:row.text, source:row.source||""}));
+          setQuotes([...validSeeded, ...dbQuotes]);
+        } else {
+          setQuotes(dbQuotes);
+        }
       }
+    }catch(e){
+      console.error("fetchData error:", e);
     }
   };
 
@@ -1117,18 +1161,28 @@ export default function App(){
   },[authReady,session]);
 
   const handleLogout=async()=>{
-    await supabase.auth.signOut();
+    try{
+      await supabase.auth.signOut();
+    }catch(e){
+      console.error("logout error:", e);
+    }
     setAllRecords({});
     setTodayRecord({am:null,pm:null});
+    setQuotes([]);
   };
 
-  const handleDone=(data)=>{
-    const updated={...allRecords};
-    if(!updated[todayStr]) updated[todayStr]={am:null,pm:null};
-    updated[todayStr][data.type]=data;
-    setAllRecords(updated);
-    setTodayRecord({...updated[todayStr]});
+  const handleDone=async(data)=>{
+    // data.dateを使う（todayStrは動的更新で変わる可能性があるため）
+    const dateKey=data.date;
+    const prev=allRecords[dateKey]||{am:null,pm:null};
+    const updatedDay={...prev,[data.type]:data}; // 新しいオブジェクトを作成（ミューテーション防止）
+    setAllRecords(r=>({...r,[dateKey]:updatedDay}));
+    setTodayRecord(updatedDay);
     setScreen("main");
+    // DBから最新データを再取得して確実に同期する
+    if(session) {
+      try{ await fetchData(session.user.id); }catch(e){ console.error("refetch error:",e); }
+    }
   };
 
   const showMenu=()=>setMenuOpen(true);
