@@ -1,4 +1,4 @@
-const CACHE_NAME = "ippo-v2"; // バージョンを上げると古いキャッシュが自動削除される
+const CACHE_NAME = "ippo-v3"; // バージョンを上げると古いキャッシュが自動削除される
 
 const SHELL_ASSETS = [
   "./manifest.json",
@@ -60,6 +60,31 @@ self.addEventListener("fetch", (e) => {
         return res;
       })
       .catch(() => caches.match(e.request))
+  );
+});
+
+// プッシュ通知受信（Web Push API）
+self.addEventListener("push", (e) => {
+  let data = {};
+  try {
+    data = e.data ? e.data.json() : {};
+  } catch (_) {
+    data = { title: "iPPO", body: e.data ? e.data.text() : "" };
+  }
+  const title = data.title || "iPPO";
+  const options = {
+    body: data.body || "",
+    icon: "/ippo/logo192.png",
+    badge: "/ippo/logo192.png",
+    tag: data.tag || "ippo-push",
+    requireInteraction: false,
+    data: { url: data.url || "./" },
+  };
+  e.waitUntil(
+    self.registration.getNotifications({ tag: options.tag }).then((existing) => {
+      for (const n of existing) n.close();
+      return self.registration.showNotification(title, options);
+    })
   );
 });
 
