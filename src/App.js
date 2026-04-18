@@ -64,10 +64,11 @@ async function loadQuotes(userId) {
 }
 
 // 言葉をSupabaseに追加
+// 成功時: { data }, 失敗時: { error }
 async function insertQuote(text, source, userId) {
   const { data, error } = await supabase.from("quotes").insert({ text, source: source || "", user_id: userId }).select().single();
-  if (error) { console.error("quote insert error:", error); return null; }
-  return data;
+  if (error) { console.error("quote insert error:", error); return { error }; }
+  return { data };
 }
 
 // 言葉をSupabaseで更新（userId照合で他人のデータ更新を防止）
@@ -502,13 +503,20 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
   const [newText,setNewText]=useState("");
   const [newSource,setNewSource]=useState("");
   const [saving,setSaving]=useState(false);
+  const [addError,setAddError]=useState("");
 
   const handleAdd=async()=>{
     if(!newText.trim()) return;
+    setAddError("");
     setSaving(true);
-    const saved = await insertQuote(newText.trim(), newSource.trim(), userId);
-    if(saved && setQuotes) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+    const res = await insertQuote(newText.trim(), newSource.trim(), userId);
     setSaving(false);
+    if(res.error){
+      setAddError(res.error.message || "保存に失敗しました。ネットワーク/権限をご確認ください。");
+      return; // モーダルは閉じない
+    }
+    const saved = res.data;
+    if(saved && setQuotes) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
     setNewText("");setNewSource("");setShowAdd(false);
   };
 
@@ -524,10 +532,11 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
               style={{width:"100%",fontSize:13,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"10px 12px",resize:"none",outline:"none",lineHeight:1.7,boxSizing:"border-box",marginBottom:10}}/>
             <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧"
               style={{width:"100%",fontSize:12,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"9px 12px",outline:"none",boxSizing:"border-box",marginBottom:16}}/>
+            {addError&&<div style={{marginBottom:12,padding:"9px 12px",borderRadius:10,background:"#FEE2E2",border:"1px solid #FECACA",color:"#991B1B",fontSize:11,lineHeight:1.5}}>{addError}</div>}
             <div style={{display:"flex",gap:8}}>
               <button onClick={handleAdd} disabled={saving}
                 style={{flex:1,padding:"12px 0",borderRadius:12,background:saving?T.border:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:500,cursor:saving?"default":"pointer"}}>{saving?"保存中...":"保存する"}</button>
-              <button onClick={()=>setShowAdd(false)} disabled={saving}
+              <button onClick={()=>{setAddError("");setShowAdd(false);}} disabled={saving}
                 style={{padding:"12px 16px",borderRadius:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,fontSize:13,cursor:"pointer"}}>キャンセル</button>
             </div>
           </div>
@@ -844,6 +853,8 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
   const [otherQuote,setOtherQuote]=useState(null);
   const [loadingOther,setLoadingOther]=useState(true);
   const [addingOther,setAddingOther]=useState(false);
+  const [addError,setAddError]=useState("");
+  const [otherError,setOtherError]=useState("");
 
   const featured=quotes.length>0?quotes[featuredIdx%quotes.length]:null;
 
@@ -858,19 +869,31 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
 
   const handleAddNew=async()=>{
     if(!newText.trim()) return;
+    setAddError("");
     setSavingNew(true);
-    const saved=await insertQuote(newText.trim(),newSource.trim(),userId);
-    if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+    const res=await insertQuote(newText.trim(),newSource.trim(),userId);
     setSavingNew(false);
+    if(res.error){
+      setAddError(res.error.message || "保存に失敗しました。ネットワーク/権限をご確認ください。");
+      return; // モーダルは閉じない
+    }
+    const saved=res.data;
+    if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
     setNewText("");setNewSource("");setShowAdd(false);
   };
 
   const handleAddOther=async()=>{
     if(!otherQuote||addingOther) return;
+    setOtherError("");
     setAddingOther(true);
-    const saved=await insertQuote(otherQuote.text,otherQuote.source||"",userId);
-    if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
+    const res=await insertQuote(otherQuote.text,otherQuote.source||"",userId);
     setAddingOther(false);
+    if(res.error){
+      setOtherError(res.error.message || "追加に失敗しました。");
+      return;
+    }
+    const saved=res.data;
+    if(saved) setQuotes(p=>[...p,{id:saved.id,text:saved.text,source:saved.source||""}]);
     fetchOtherQuote();
   };
 
@@ -886,10 +909,11 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
               style={{width:"100%",fontSize:13,color:T.text,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"10px 12px",resize:"none",outline:"none",lineHeight:1.7,boxSizing:"border-box",marginBottom:10}}/>
             <input value={newSource} onChange={e=>setNewSource(e.target.value)} placeholder="出典（任意）：例）アドラー、夜と霧"
               style={{width:"100%",fontSize:12,color:T.textMuted,background:T.sub,border:`0.5px solid ${T.border}`,borderRadius:10,padding:"9px 12px",outline:"none",boxSizing:"border-box",marginBottom:16}}/>
+            {addError&&<div style={{marginBottom:12,padding:"9px 12px",borderRadius:10,background:"#FEE2E2",border:"1px solid #FECACA",color:"#991B1B",fontSize:11,lineHeight:1.5}}>{addError}</div>}
             <div style={{display:"flex",gap:8}}>
               <button onClick={handleAddNew} disabled={savingNew}
                 style={{flex:1,padding:"12px 0",borderRadius:12,background:savingNew?T.border:T.accent,border:"none",color:"#fff",fontSize:13,fontWeight:500,cursor:savingNew?"default":"pointer"}}>{savingNew?"保存中...":"保存する"}</button>
-              <button onClick={()=>setShowAdd(false)} disabled={savingNew}
+              <button onClick={()=>{setAddError("");setShowAdd(false);}} disabled={savingNew}
                 style={{padding:"12px 16px",borderRadius:12,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,fontSize:13,cursor:"pointer"}}>キャンセル</button>
             </div>
           </div>
@@ -923,6 +947,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
                 <button onClick={fetchOtherQuote} disabled={loadingOther}
                   style={{padding:"9px 14px",borderRadius:10,background:"transparent",border:`0.5px solid ${T.border}`,color:T.textMuted,fontSize:12,cursor:"pointer"}}>他の言葉</button>
               </div>
+              {otherError&&<div style={{marginTop:8,padding:"8px 10px",borderRadius:8,background:"#FEE2E2",border:"1px solid #FECACA",color:"#991B1B",fontSize:11,lineHeight:1.5}}>{otherError}</div>}
             </>
           ):(
             <div style={{textAlign:"center",padding:"12px 0",fontSize:12,color:T.textMuted}}>他のユーザーの言葉はまだありません</div>
@@ -1136,10 +1161,15 @@ export default function App(){
       setAllRecords(recs);
       setTodayRecord(recs[todayStr]||{am:null,pm:null});
       if(dbQuotes !== null) {
-        const hasDefaults = dbQuotes.some(q => q.source === "iPPO");
-        if(!hasDefaults) {
+        const hasAny = dbQuotes.length > 0;
+        // 既存ユーザー（既に何か1件でも持っている）にはシードしない。
+        // 完全に空のユーザーにだけ iPPO のデフォルト言葉をシードする。
+        if(!hasAny) {
           const seeded = await Promise.all(DEFAULT_QUOTES_DATA.map(q => insertQuote(q.text, q.source, userId)));
-          const validSeeded = seeded.filter(Boolean).map(row => ({id:row.id, text:row.text, source:row.source||""}));
+          const validSeeded = seeded
+            .map(r => r && r.data)
+            .filter(Boolean)
+            .map(row => ({id:row.id, text:row.text, source:row.source||""}));
           setQuotes([...validSeeded, ...dbQuotes]);
         } else {
           setQuotes(dbQuotes);
