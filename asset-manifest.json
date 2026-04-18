@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/ippo/static/css/main.e6c13ad2.css",
-    "main.js": "/ippo/static/js/main.03d860f5.js",
-    "static/js/59.0d268d65.chunk.js": "/ippo/static/js/59.0d268d65.chunk.js",
+    "main.js": "/ippo/static/js/main.668490a0.js",
+    "static/js/453.0439c1f0.chunk.js": "/ippo/static/js/453.0439c1f0.chunk.js",
     "index.html": "/ippo/index.html",
     "main.e6c13ad2.css.map": "/ippo/static/css/main.e6c13ad2.css.map",
-    "main.03d860f5.js.map": "/ippo/static/js/main.03d860f5.js.map",
-    "59.0d268d65.chunk.js.map": "/ippo/static/js/59.0d268d65.chunk.js.map"
+    "main.668490a0.js.map": "/ippo/static/js/main.668490a0.js.map",
+    "453.0439c1f0.chunk.js.map": "/ippo/static/js/453.0439c1f0.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.e6c13ad2.css",
-    "static/js/main.03d860f5.js"
+    "static/js/main.668490a0.js"
   ]
 }
