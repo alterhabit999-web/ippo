@@ -164,12 +164,22 @@ const AM = { bgPage:"#FFF4E8", bg:"#FFF8F0", sub:"#FFE8CC", accent:"#D45F10", ac
 const PM = { bgPage:"#1A2028", bg:"#232830", sub:"#2E3840", accent:"#5A8AAA", accentLight:"#A8C8D8", border:"#343C48", text:"#D8E8EE", textMuted:"#6A7888" };
 
 // 時刻に依存する値を動的に計算（アプリ起動後も常に最新の値を返す）
-function getIsAM() { return new Date().getHours() < 17; }
-function getTodayStr() { const n=new Date(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; }
-function getDateStr() { const n=new Date(); return `${n.getMonth()+1}月${n.getDate()}日`; }
+// iPPOの「1日」は 3:00〜翌3:00。朝の入力は 3:00〜14:00、夜の入力は 18:00〜翌3:00、
+// 14:00〜18:00 は記録不可の待機時間帯。
+function getIsAM() { const h = new Date().getHours(); return h >= 3 && h < 14; }
+function getIsRecordWindow() { const h = new Date().getHours(); return !(h >= 14 && h < 18); }
+// iPPO日付: 0:00〜2:59 は前日扱い（夜の記録を翌朝扱いにしないため）
+function getIPPODate() {
+  const n = new Date();
+  if (n.getHours() < 3) n.setDate(n.getDate() - 1);
+  return n;
+}
+function getTodayStr() { const n=getIPPODate(); return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,"0")}-${String(n.getDate()).padStart(2,"0")}`; }
+function getDateStr() { const n=getIPPODate(); return `${n.getMonth()+1}月${n.getDate()}日`; }
 
 // モジュールレベル変数（refreshTimeState()で最新に更新される）
 let isAM = getIsAM();
+let isRecordWindow = getIsRecordWindow();
 let todayStr = getTodayStr();
 let dateStr = getDateStr();
 let T = isAM ? AM : PM;
@@ -177,12 +187,14 @@ let T = isAM ? AM : PM;
 // 時刻状態を一括更新する関数（戻り値: 変化があったかどうか）
 function refreshTimeState() {
   const prevIsAM = isAM;
+  const prevWindow = isRecordWindow;
   const prevToday = todayStr;
   isAM = getIsAM();
+  isRecordWindow = getIsRecordWindow();
   todayStr = getTodayStr();
   dateStr = getDateStr();
   T = isAM ? AM : PM;
-  return prevIsAM !== isAM || prevToday !== todayStr;
+  return prevIsAM !== isAM || prevToday !== todayStr || prevWindow !== isRecordWindow;
 }
 
 const moodColor="#F0A060", energyColor="#5A8AAA", stressColor="#C07888", sleepColor="#8AAA6A";
@@ -557,7 +569,7 @@ function DoneScreen({onMenu,todayRecord,quotes,setQuotes,onTitle,userId}){
           {q.sub&&<div style={{fontSize:12,color:T.textMuted,lineHeight:1.8,fontFamily:"Georgia,serif",marginTop:8}}>{q.sub}</div>}
           {q.source&&<div style={{fontSize:11,color:T.textMuted,marginTop:6,fontFamily:"Georgia,serif"}}>— {q.source}</div>}
         </div>
-        <div style={{fontSize:10,color:T.textMuted}}>{dateStr}の記録が完了しました</div>
+        <div style={{fontSize:10,color:T.textMuted}}>{(amDone||pmDone)?`${dateStr}の記録が完了しました`:"次の記録時間までひと息ついて"}</div>
         <div style={{display:"flex",gap:12}}>
           {[["朝",amDone],["夜",pmDone]].map(([label,done],i)=>(
             <div key={i} style={{display:"flex",alignItems:"center",gap:5}}>
@@ -927,7 +939,7 @@ function CollectedWordsScreen({onMenu, quotes, setQuotes, onTitle, userId}){
             <div style={{fontSize:10,letterSpacing:"0.12em",color:T.accent,marginBottom:12,fontWeight:500}}>今日の言葉</div>
             <div style={{fontSize:15,color:T.text,lineHeight:2,fontFamily:"Georgia,serif",whiteSpace:"pre-line"}}>"{featured.text}"</div>
             {featured.source&&<div style={{fontSize:11,color:T.textMuted,marginTop:8,fontFamily:"Georgia,serif"}}>— {featured.source}</div>}
-            <button onClick={()=>{if(quotes.length>1) setFeaturedIdx(i=>(i+1)%quotes.length);}}
+            <button onClick={()=>setFeaturedIdx(i=>{if(quotes.length<=1)return i;let n;do{n=Math.floor(Math.random()*quotes.length);}while(n===i);return n;})}
               style={{marginTop:14,padding:"5px 18px",borderRadius:99,background:"transparent",border:`0.5px solid ${T.border}`,fontSize:11,color:T.textMuted,cursor:"pointer"}}>別の言葉を見る</button>
           </div>
         )}
@@ -1378,7 +1390,7 @@ export default function App(){
 
   const amDone=todayRecord?.am!=null;
   const pmDone=todayRecord?.pm!=null;
-  const showDone=(isAM&&amDone)||(!isAM&&pmDone)||(amDone&&pmDone);
+  const showDone=!isRecordWindow||(isAM&&amDone)||(!isAM&&pmDone)||(amDone&&pmDone);
 
   if(!authReady) return(
     <>
